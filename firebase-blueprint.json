@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "UserConfig": {
+      "title": "User Config",
+      "description": "User configuration for Drive, Bluesky, Twitter and scheduler",
+      "type": "object",
+      "properties": {
+        "driveFolderId": { "type": "string", "description": "Google Drive Folder ID to poll" },
+        "minIntervalHours": { "type": "integer", "description": "Minimum range hours" },
+        "maxIntervalHours": { "type": "integer", "description": "Maximum range hours" },
+        "nextPostTime": { "type": "integer", "description": "Scheduled next post timestamp" },
+        "isPollingActive": { "type": "boolean", "description": "Is active auto-polling" },
+        "blueskyUsername": { "type": "string", "description": "Bluesky Identifier" },
+        "blueskyPassword": { "type": "string", "description": "Bluesky App Password" },
+        "blueskyEnabled": { "type": "boolean" },
+        "twitterApiKey": { "type": "string" },
+        "twitterApiSecret": { "type": "string" },
+        "twitterAccessToken": { "type": "string" },
+        "twitterAccessSecret": { "type": "string" },
+        "twitterEnabled": { "type": "boolean" },
+        "webhookUrl": { "type": "string" },
+        "webhookEnabled": { "type": "boolean" },
+        "updatedAt": { "type": "integer" }
+      },
+      "required": ["driveFolderId"]
+    },
+    "PostItem": {
+      "title": "Post Item",
+      "description": "A single photo item proposed, edited, or posted",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "driveFileId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "captions": { "type": "array" },
+        "selectedCaption": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "integer" },
+        "postedAt": { "type": "integer" },
+        "skippedAt": { "type": "integer" }
+      },
+      "required": ["id", "fileName", "mimeType", "status", "createdAt"]
+    },
+    "LogItem": {
+      "title": "Log Item",
+      "description": "A system log representing poller occurrences",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "integer" }
+      },
+      "required": ["id", "type", "message", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserConfig",
+      "description": "Stores user configuration"
+    },
+    "users/{userId}/posts/{postId}": {
+      "schema": "PostItem",
+      "description": "Proposed and processed photo posts"
+    },
+    "users/{userId}/logs/{logId}": {
+      "schema": "LogItem",
+      "description": "Automated action event logs"
+    }
+  }
+}

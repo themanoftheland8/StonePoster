@@ -1,0 +1,44 @@
+name: Deploy to Firebase on Push
+
+on:
+  push:
+    branches:
+      - main
+      - master # Triggers on main or master pushes
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Deploy to Firebase Hosting (Standard Service Account)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          channelId: live
+          projectId: twittertry2-8a870
+        continue-on-error: true # Falls back gracefully if using FIREBASE_TOKEN
+
+      # Fallback or alternative step to deploy and update Firestore Security Rules as well
+      - name: Deploy Rules & Hosting via Firebase CLI Token
+        if: env.FIREBASE_TOKEN != ''
+        run: npx firebase-tools deploy --only hosting,firestore --project twittertry2-8a870 --token "$FIREBASE_TOKEN"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

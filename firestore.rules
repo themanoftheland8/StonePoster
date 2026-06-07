@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Strict validation for User configurations
+    function isValidUserConfig(data) {
+      return data.driveFolderId is string 
+          && data.driveFolderId.size() <= 200
+          && (!data.keys().hasAll(['minIntervalHours']) || data.minIntervalHours is int)
+          && (!data.keys().hasAll(['maxIntervalHours']) || data.maxIntervalHours is int)
+          && (!data.keys().hasAll(['isPollingActive']) || data.isPollingActive is bool);
+    }
+
+    // Strict validation for Post items
+    function isValidPostItem(data) {
+      return data.id is string 
+          && data.fileName is string 
+          && data.mimeType is string 
+          && data.imageUrl is string
+          && data.status is string
+          && data.createdAt is int;
+    }
+
+    // Strict validation for Log items
+    function isValidLogItem(data) {
+      return data.id is string 
+          && data.type is string 
+          && data.message is string 
+          && data.timestamp is int;
+    }
+
+    // Match users configuration
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserConfig(request.resource.data);
+      allow update: if isOwner(userId) && isValidUserConfig(request.resource.data);
+      allow delete: if isOwner(userId);
+
+      // Match user's posts subcollection
+      match /posts/{postId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidPostItem(request.resource.data);
+        allow update: if isOwner(userId) && isValidPostItem(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // Match user's logs subcollection
+      match /logs/{logId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidLogItem(request.resource.data);
+        allow update: if isOwner(userId) && isValidLogItem(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

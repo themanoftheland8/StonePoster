@@ -8,15 +8,25 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Initialize Gemini client on the server side
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
+// Lazy initialization helper for Gemini
+let aiInstance: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY environment variable is missing. Please add it to your environment settings.');
+    }
+    aiInstance = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+  }
+  return aiInstance;
+}
 
 const app = express();
 const PORT = 3000;
@@ -94,7 +104,7 @@ app.post('/api/posts/analyze-gdrive', async (req, res) => {
       "Caption idea 3..."
     ]`;
 
-    const geminiRes = await ai.models.generateContent({
+    const geminiRes = await getGeminiClient().models.generateContent({
       model: 'gemini-3.5-flash',
       contents: [
         {
@@ -139,7 +149,7 @@ app.post('/api/posts/analyze-upload', async (req, res) => {
     const cleanBase64 = base64Data.split(',')[1] || base64Data;
     const safeMimeType = mimeType || 'image/jpeg';
 
-    const geminiRes = await ai.models.generateContent({
+    const geminiRes = await getGeminiClient().models.generateContent({
       model: 'gemini-3.5-flash',
       contents: [
         {

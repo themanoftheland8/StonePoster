@@ -26,6 +26,7 @@ import { UserConfig, PostItem, LogItem } from './types';
 import ConfigManager from './components/ConfigManager';
 import PhoneSimulator from './components/PhoneSimulator';
 import ManualUploadCard from './components/ManualUploadCard';
+import { versionInfo } from './version';
 
 import {
   Compass,
@@ -718,10 +719,15 @@ export default function App() {
       <header className="sticky top-0 z-40 glass-premium border-b border-brand-gold/15 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-brand-gold-dark via-brand-gold to-yellow-200 shadow-md shadow-brand-gold/15 flex items-center justify-center text-bg-dark font-display font-black text-xs sm:text-sm shrink-0">
-            GP
+            SCM
           </div>
           <div className="min-w-0">
-            <h1 className="font-display font-bold text-text-main tracking-tight text-xs sm:text-base md:text-lg truncate">Google Drive Social Poster</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-display font-bold text-text-main tracking-tight text-xs sm:text-base md:text-lg truncate">StoneContentManager</h1>
+              <span className="px-1.5 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold text-[8px] sm:text-[9px] font-mono leading-none tracking-wider font-extrabold uppercase border border-brand-gold/30">
+                {versionInfo.version}
+              </span>
+            </div>
             <p className="text-[8px] sm:text-[10px] text-brand-gold/75 font-mono uppercase tracking-wider font-semibold truncate">Automatic Polling & Gemini Vision Copywriting</p>
           </div>
         </div>
@@ -1028,7 +1034,13 @@ export default function App() {
       <footer className="glass-premium border-t border-brand-gold/10 py-6 text-center text-xs text-text-muted mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>Enterprise edition • Sandbox Node running on Port 3000</span>
-          <span>Google AI Studio App • Protected Environment</span>
+          <span className="font-mono text-[9px] sm:text-xs flex items-center gap-1.5 flex-wrap">
+            <span>App Version: <strong className="text-brand-gold font-semibold">{versionInfo.version}</strong></span>
+            <span className="text-brand-gold/40">•</span>
+            <span>Commit: <strong className="text-brand-gold font-semibold">{versionInfo.sha}</strong></span>
+            <span className="text-brand-gold/40">•</span>
+            <span>Built: <strong className="text-brand-gold font-semibold">{versionInfo.timestamp}</strong></span>
+          </span>
         </div>
       </footer>
 

@@ -25,6 +25,10 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Create Version Tag
+        run: |
+          echo "export const versionInfo = { version: '1.0.${{ github.run_number }}', sha: '$(echo "${{ github.sha }}" | cut -c1-7)', timestamp: '$(date -u +'%Y-%m-%dT%H:%M:%SZ')' };" > src/version.ts
+
       - name: Build Application
         run: npm run build
         env:

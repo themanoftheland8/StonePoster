@@ -1,5 +1,5 @@
 {
-  "name": "Google Drive Social Poster",
+  "name": "StoneContentManager",
   "description": "Automatic content poller and social media poster with Gemini visual copywriting.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

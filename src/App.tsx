@@ -281,9 +281,9 @@ export default function App() {
       const text = await res.text();
       const isHtml = text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<!doctype') || text.trim().includes('<html') || text.trim().startsWith('<');
       if (isHtml) {
-        throw new Error(`${errorLabel}: Server returned an HTML block instead of JSON data. The server might still be booting up, or this API route does not exist. Check server.ts port routing.`);
+        throw new Error(`${errorLabel}: Server returned HTTP ${res.status} (${res.statusText}) HTML block: "${text.substring(0, 300).replace(/[\r\n]+/g, ' ')}"`);
       }
-      throw new Error(`${errorLabel}: Expected JSON response, but received non-JSON: ${text.substring(0, 150)}`);
+      throw new Error(`${errorLabel}: Expected JSON response, but received non-JSON (HTTP ${res.status}): ${text.substring(0, 150)}`);
     }
     try {
       const resClone = res.clone();
@@ -313,8 +313,8 @@ export default function App() {
     await createSystemLog(user.uid, 'info', `Scanning Google Drive Location for assets: [${config?.driveFolderId}]`);
 
     try {
-      // 1. Fetch file list under configured parent directory
-      const listUrl = `https://www.googleapis.com/drive/v3/files?q='${config?.driveFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType)&pageSize=100`;
+      // 1. Fetch file list under configured parent directory (include file size to prevent downloading huge files)
+      const listUrl = `https://www.googleapis.com/drive/v3/files?q='${config?.driveFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size)&pageSize=100`;
       const response = await fetch(listUrl, {
         headers: { Authorization: `Bearer ${gdriveToken}` },
       });
@@ -326,14 +326,17 @@ export default function App() {
       const rawResult = await response.json();
       const items = rawResult.files || [];
 
-      // Filter only image and short video kinds
-      const mediaItems = items.filter((f: any) =>
-        f.mimeType.startsWith('image/') || f.mimeType.startsWith('video/')
-      );
+      // Filter only image and short video kinds, and check size to avoid downloading files that are too large (e.g. max 15MB)
+      const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15MB
+      const mediaItems = items.filter((f: any) => {
+        const isSupportedType = f.mimeType.startsWith('image/') || f.mimeType.startsWith('video/');
+        const isSizeAcceptable = !f.size || parseInt(f.size) <= MAX_FILE_SIZE_BYTES;
+        return isSupportedType && isSizeAcceptable;
+      });
 
       if (mediaItems.length === 0) {
-        await createSystemLog(user.uid, 'info', 'No image/video assets discovered in target folder');
-        alert(`We scanned Drive Folder [${config?.driveFolderId}] but found no image or video assets. Please add files to this Drive directory.`);
+        await createSystemLog(user.uid, 'info', 'No supportable image/video assets discovered in target folder');
+        alert(`We scanned Drive Folder [${config?.driveFolderId}] but found no image or video assets within our 15MB size limit. Please ensure your files are below 15MB each.`);
         setIsPolling(false);
         return;
       }
@@ -430,6 +433,14 @@ export default function App() {
 
     setIsProcessing(true);
     await createSystemLog(user.uid, 'info', `Uploading file '${file.name}' to Google Drive parent directory: [${config?.driveFolderId}]`);
+
+    // Guard manual uploads against extremely large files that exceed proxy / browser limits
+    const MAX_MANUAL_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_MANUAL_SIZE_BYTES) {
+      alert(`The selected file is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please upload a file smaller than 10MB to optimize performance and prevent gateway timeouts.`);
+      setIsProcessing(false);
+      return;
+    }
 
     try {
       const base64Data = await convertFileToBase64(file);

@@ -273,6 +273,25 @@ export default function App() {
     });
   };
 
+  // Safe JSON parsing helper to raise readable, friendly errors instead of "Unexpected token <" HTML pages
+  const safeFetchJson = async (res: Response, errorLabel: string): Promise<any> => {
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await res.text();
+      const isHtml = text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<!doctype') || text.trim().includes('<html') || text.trim().startsWith('<');
+      if (isHtml) {
+        throw new Error(`${errorLabel}: Server returned an HTML block instead of JSON data. The server might still be booting up, or this API route does not exist. Check server.ts port routing.`);
+      }
+      throw new Error(`${errorLabel}: Expected JSON response, but received non-JSON: ${text.substring(0, 150)}`);
+    }
+    try {
+      const resClone = res.clone();
+      return await resClone.json();
+    } catch (parseErr: any) {
+      throw new Error(`${errorLabel}: Failed to parse JSON response: ${parseErr.message}`);
+    }
+  };
+
   // Run auto-poll if countdown reaches 0 to mock automated background routine
   const triggerAutoPoll = async () => {
     if (!user || isPolling || isProcessing || !config?.isPollingActive) return;
@@ -349,11 +368,11 @@ export default function App() {
       });
 
       if (!analyzeRes.ok) {
-        const errPayload = await analyzeRes.json();
+        const errPayload = await safeFetchJson(analyzeRes, 'Server captioning pipeline failed').catch(e => ({ error: e.message }));
         throw new Error(errPayload.error || 'Server captioning pipeline failed');
       }
 
-      const analyzedOutput = await analyzeRes.json();
+      const analyzedOutput = await safeFetchJson(analyzeRes, 'Failed to extract captions content');
       const generatedCaptions = analyzedOutput.captions;
       const fileUrlData = analyzedOutput.imageUrl;
 
@@ -428,10 +447,11 @@ export default function App() {
       });
 
       if (!uploadRes.ok) {
-        throw new Error('Failed to upload manual file to Google Drive directory');
+        const errPayload = await safeFetchJson(uploadRes, 'Upload endpoint failed').catch(() => ({}));
+        throw new Error(errPayload.error || 'Failed to upload manual file to Google Drive directory');
       }
 
-      const uploadResult = await uploadRes.json();
+      const uploadResult = await safeFetchJson(uploadRes, 'Upload format parsing failed');
       const driveFileId = uploadResult.fileId;
       await createSystemLog(user.uid, 'success', `Successfully mirrored file to Google Drive. GDrive ID: ${driveFileId}`);
 
@@ -447,10 +467,11 @@ export default function App() {
       });
 
       if (!analyzeRes.ok) {
-        throw new Error('Gemini caption analysis failed for uploaded file');
+        const errPayload = await safeFetchJson(analyzeRes, 'Analyze endpoint failed').catch(() => ({}));
+        throw new Error(errPayload.error || 'Gemini caption analysis failed for uploaded file');
       }
 
-      const analyzedOutput = await analyzeRes.json();
+      const analyzedOutput = await safeFetchJson(analyzeRes, 'Analyze format parsing failed');
       const generatedCaptions = analyzedOutput.captions;
       const imageUrl = analyzedOutput.imageUrl;
 
@@ -501,10 +522,11 @@ export default function App() {
       });
 
       if (!reRes.ok) {
-        throw new Error('Gemini API failed during caption regeneration');
+        const errPayload = await safeFetchJson(reRes, 'Regenerate API failed').catch(() => ({}));
+        throw new Error(errPayload.error || 'Gemini API failed during caption regeneration');
       }
 
-      const resultData = await reRes.json();
+      const resultData = await safeFetchJson(reRes, 'Regenerate content parsing failed');
 
       // Update post registry
       const updatedNode: PostItem = {
@@ -567,10 +589,11 @@ export default function App() {
       });
 
       if (!publishRes.ok) {
-        throw new Error('Social posting node request failed');
+        const errPayload = await safeFetchJson(publishRes, 'Publishing endpoint failed').catch(() => ({}));
+        throw new Error(errPayload.error || 'Social posting node request failed');
       }
 
-      const publishResult = await publishRes.json();
+      const publishResult = await safeFetchJson(publishRes, 'Publish outcome parsing failed');
 
       // Create detailed output logger
       const bskyOutcome = publishResult.results.bsky;

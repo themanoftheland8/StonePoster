@@ -9,6 +9,9 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    env:
+      SA_EXISTS: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      TOKEN_EXISTS: ${{ secrets.FIREBASE_TOKEN }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -28,7 +31,7 @@ jobs:
           NODE_ENV: production
 
       - name: Deploy to Firebase Hosting (Standard Service Account)
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+        if: ${{ env.SA_EXISTS != '' }}
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
@@ -38,13 +41,13 @@ jobs:
 
       # Fallback or alternative step to deploy and update Firestore Security Rules as well
       - name: Deploy Rules & Hosting via Firebase CLI Token
-        if: ${{ secrets.FIREBASE_TOKEN != '' }}
+        if: ${{ env.TOKEN_EXISTS != '' }}
         run: npx firebase-tools deploy --only hosting,firestore --project twittertry2-8a870 --token "$FIREBASE_TOKEN"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
       - name: Diagnostic Alert if Secrets are Missing
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT == '' && secrets.FIREBASE_TOKEN == '' }}
+        if: ${{ env.SA_EXISTS == '' && env.TOKEN_EXISTS == '' }}
         run: |
           echo "========================================================"
           echo "⚠️ CONFIGURATION WARNING: FIREBASE SECRETS ARE NOT CONFIGURED"

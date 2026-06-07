@@ -28,17 +28,30 @@ jobs:
           NODE_ENV: production
 
       - name: Deploy to Firebase Hosting (Standard Service Account)
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           channelId: live
           projectId: twittertry2-8a870
-        continue-on-error: true # Falls back gracefully if using FIREBASE_TOKEN
 
       # Fallback or alternative step to deploy and update Firestore Security Rules as well
       - name: Deploy Rules & Hosting via Firebase CLI Token
-        if: env.FIREBASE_TOKEN != ''
+        if: ${{ secrets.FIREBASE_TOKEN != '' }}
         run: npx firebase-tools deploy --only hosting,firestore --project twittertry2-8a870 --token "$FIREBASE_TOKEN"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+
+      - name: Diagnostic Alert if Secrets are Missing
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT == '' && secrets.FIREBASE_TOKEN == '' }}
+        run: |
+          echo "========================================================"
+          echo "⚠️ CONFIGURATION WARNING: FIREBASE SECRETS ARE NOT CONFIGURED"
+          echo "The build completed successfully, but deployment was bypassed."
+          echo "To activate automatic Firebase deployment when pushing to GitHub, please:"
+          echo "  1. Add FIREBASE_SERVICE_ACCOUNT to your GitHub Repository Secrets"
+          echo "  OR"
+          echo "  2. Add FIREBASE_TOKEN to your GitHub Repository Secrets"
+          echo "This alert guarantees the workflow completes successfully (green)."
+          echo "========================================================"

@@ -6,7 +6,10 @@ import { GoogleGenAI } from '@google/genai';
 import { TwitterApi } from 'twitter-api-v2';
 import dotenv from 'dotenv';
 
+import fs from 'fs';
+
 dotenv.config();
+
 
 // Lazy initialization helper for Gemini
 let aiInstance: GoogleGenAI | null = null;
@@ -36,6 +39,12 @@ app.use(express.json({ limit: '50mb' }));
 
 // Request Logging Middleware for auditing incoming requests
 app.use((req, res, next) => {
+  const line = `[${new Date().toISOString()}] ${req.method} ${req.path} - Headers: ${JSON.stringify(req.headers)}\n`;
+  try {
+    fs.appendFileSync(path.join(process.cwd(), 'requests.log'), line);
+  } catch (e) {
+    console.error('Failed to write to requests.log', e);
+  }
   console.log(`[REQUEST] ${req.method} ${req.path}`);
   next();
 });

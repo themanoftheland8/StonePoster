@@ -84,7 +84,7 @@ function cleanAndParseJSON(text: string): string[] {
 }
 
 // 1. POST Endpoint to fetch and caption photo/video from Google Drive
-app.post('/api/posts/analyze-gdrive', async (req, res) => {
+app.post(['/api/posts/analyze-gdrive', '/api/posts/analyze-gdrive/'], async (req, res) => {
   const { fileId, mimeType, gdriveToken } = req.body;
 
   if (!fileId || !gdriveToken) {
@@ -148,7 +148,7 @@ app.post('/api/posts/analyze-gdrive', async (req, res) => {
 });
 
 // 2. POST Endpoint to analyze manual upload
-app.post('/api/posts/analyze-upload', async (req, res) => {
+app.post(['/api/posts/analyze-upload', '/api/posts/analyze-upload/'], async (req, res) => {
   const { fileName, mimeType, base64Data } = req.body;
 
   if (!base64Data) {
@@ -192,7 +192,7 @@ app.post('/api/posts/analyze-upload', async (req, res) => {
 });
 
 // 3. POST Endpoint to publish to Bluesky and X
-app.post('/api/posts/publish', async (req, res) => {
+app.post(['/api/posts/publish', '/api/posts/publish/'], async (req, res) => {
   const {
     caption,
     imageUrl, // fully qualified data:image/jpeg;base64,...
@@ -347,7 +347,7 @@ app.post('/api/posts/publish', async (req, res) => {
 });
 
 // 4. POST Endpoint to upload files manually directly onto user's Google Drive folder
-app.post('/api/drive/upload', async (req, res) => {
+app.post(['/api/drive/upload', '/api/drive/upload/'], async (req, res) => {
   const { fileName, mimeType, base64Data, parentFolderId, gdriveToken } = req.body;
 
   if (!base64Data || !gdriveToken || !parentFolderId) {
@@ -407,7 +407,7 @@ app.post('/api/drive/upload', async (req, res) => {
 });
 
 // 5. POST Endpoint to move file inside Google Drive
-app.post('/api/drive/move-file', async (req, res) => {
+app.post(['/api/drive/move-file', '/api/drive/move-file/'], async (req, res) => {
   const { fileId, parentFolderId, destinationFolderName, gdriveToken } = req.body;
 
   if (!fileId || !parentFolderId || !destinationFolderName || !gdriveToken) {

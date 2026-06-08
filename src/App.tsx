@@ -68,6 +68,35 @@ export default function App() {
   // Counter
   const [countdownStr, setCountdownStr] = useState<string>('Not Scheduled');
 
+  // Diagnostic State for static hosting environments (e.g. static Firebase Hosting preventing express execution)
+  const [hostingDiagnosticWarning, setHostingDiagnosticWarning] = useState<string | null>(null);
+
+  // Check backend health to verify if we are running in a static-only hosting environment
+  useEffect(() => {
+    const checkBackendHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+          const contentType = res.headers.get('content-type') || '';
+          if (!contentType.includes('application/json')) {
+            setHostingDiagnosticWarning(
+              'Static-only hosting environment detected (Firebase Hosting). The required Node.js Express server is not running on this URL.'
+            );
+          }
+        } else {
+          setHostingDiagnosticWarning(
+            'The Express API backend cannot be reached. Verify that the server is running on port 3000.'
+          );
+        }
+      } catch (err) {
+        setHostingDiagnosticWarning(
+          'API connection failed. The server backend is offline or inaccessible.'
+        );
+      }
+    };
+    checkBackendHealth();
+  }, []);
+
   // Configure Google OAuth provider with scopes
   const provider = new GoogleAuthProvider();
   provider.addScope('https://www.googleapis.com/auth/drive');
@@ -264,6 +293,72 @@ export default function App() {
     }
   };
 
+  // Downscale a base64 image data-URI using client-side canvas
+  const downscaleBase64Image = (base64Str: string, maxDim = 1024, quality = 0.8): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!base64Str || !base64Str.startsWith('data:image/') || base64Str.length < 200000) {
+        resolve(base64Str);
+        return;
+      }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = base64Str;
+      img.onload = () => {
+        try {
+          let width = img.width;
+          let height = img.height;
+
+          if (width <= maxDim && height <= maxDim) {
+            resolve(base64Str);
+            return;
+          }
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(base64Str);
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Get original mime type
+          const matchMime = base64Str.match(/data:([^;]+);/);
+          const originalMime = matchMime ? matchMime[1] : 'image/jpeg';
+          const outputMime = originalMime.includes('png') || originalMime.includes('webp') ? originalMime : 'image/jpeg';
+
+          const resBase64 = canvas.toDataURL(outputMime, quality);
+          if (resBase64.length < base64Str.length) {
+            resolve(resBase64);
+          } else {
+            resolve(base64Str);
+          }
+        } catch (err) {
+          console.error('Failed to downscale base64 image on canvas:', err);
+          resolve(base64Str);
+        }
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
+
   // Convert binary file content to base64 Data Url
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -378,7 +473,12 @@ export default function App() {
 
       const analyzedOutput = await safeFetchJson(analyzeRes, 'Failed to extract captions content');
       const generatedCaptions = analyzedOutput.captions;
-      const fileUrlData = analyzedOutput.imageUrl;
+      let fileUrlData = analyzedOutput.imageUrl;
+
+      // Downscale image if too large (e.g. from high resolution Drive sync) before saving to Firestore
+      if (selectedFile.mimeType.startsWith('image/')) {
+        fileUrlData = await downscaleBase64Image(fileUrlData);
+      }
 
       // 3. Register proposed post drafted in Firestore
       const newPostId = `post_${Date.now()}`;
@@ -443,7 +543,12 @@ export default function App() {
     }
 
     try {
-      const base64Data = await convertFileToBase64(file);
+      let base64Data = await convertFileToBase64(file);
+
+      // Downscale image if too large before uploading to keep network payload small and avoid gateway timeouts
+      if (file.type.startsWith('image/')) {
+        base64Data = await downscaleBase64Image(base64Data);
+      }
 
       // 1. Upload onto GDrive through Express middleware
       const uploadRes = await fetch('/api/drive/upload', {
@@ -485,7 +590,12 @@ export default function App() {
 
       const analyzedOutput = await safeFetchJson(analyzeRes, 'Analyze format parsing failed');
       const generatedCaptions = analyzedOutput.captions;
-      const imageUrl = analyzedOutput.imageUrl;
+      let imageUrl = analyzedOutput.imageUrl;
+
+      // Downscale returning analyze image if it is too massive before committing to Firestore
+      if (file.type.startsWith('image/')) {
+        imageUrl = await downscaleBase64Image(imageUrl);
+      }
 
       // 3. Save into user posts history
       const newPostId = `post_${Date.now()}`;
@@ -760,6 +870,26 @@ export default function App() {
           </div>
         )}
       </header>
+
+      {hostingDiagnosticWarning && (
+        <div className="bg-amber-950/40 border-b border-amber-500/20 px-4 py-3 text-xs text-amber-200">
+          <div className="max-w-7xl mx-auto flex items-start gap-3 text-left">
+            <Shield className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="text-amber-300 font-semibold block">Static-Only Routing Detected:</span>
+              <p className="leading-relaxed text-amber-200/90">
+                You are currently running the application on a static hosting service (Firebase Hosting). 
+                Static hosts are designed for client-only files and, by default, rewrite backend API paths back to <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">index.html</code>. 
+                This causes endpoints like <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">/api/drive/upload</code> to return HTML content in HTTP 200 instead of a JSON response.
+              </p>
+              <p className="text-[11px] text-amber-400/90">
+                💡 <span className="font-semibold">How to resolve:</span> Access the application using your authorized <strong className="text-amber-300">Cloud Run Dev Preview Link</strong> in Google AI Studio. 
+                The Cloud Run Preview successfully hosts the full Node.js Express server to handle all server-side operations (Google Drive file writes, Gemini Vision prompts, and social publishing).
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex-1 flex flex-col items-center justify-center py-20">

@@ -47,12 +47,12 @@ jobs:
 
       - name: Deploy to Firebase via Service Account (Hosting, Firestore, Functions)
         if: ${{ env.SA_EXISTS != '' }}
-        run: npx firebase-tools deploy --project twittertry2-8a870
+        run: npx firebase-tools deploy --project twittertry2-8a870 --force
 
       # Fallback or alternative step to deploy using Firebase Token
       - name: Deploy via Firebase CLI Token
         if: ${{ env.TOKEN_EXISTS != '' && env.SA_EXISTS == '' }}
-        run: npx firebase-tools deploy --project twittertry2-8a870 --token "$FIREBASE_TOKEN"
+        run: npx firebase-tools deploy --project twittertry2-8a870 --token "$FIREBASE_TOKEN" --force
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 

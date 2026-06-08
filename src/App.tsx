@@ -52,6 +52,8 @@ import {
   Share2,
   MessageSquare,
   Check,
+  X,
+  Zap,
 } from 'lucide-react';
 
 export default function App() {
@@ -96,6 +98,40 @@ export default function App() {
     message: string;
     technicalDetails?: string;
   } | null>(null);
+
+  // Non-blocking top banner for transient / rate-limit notifications
+  const [notifBanner, setNotifBanner] = useState<{
+    message: string;
+    retryAt?: string;
+  } | null>(null);
+  const bannerTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerBanner = (message: string, retryAt?: string) => {
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    setNotifBanner({ message, retryAt });
+    bannerTimerRef.current = setTimeout(() => setNotifBanner(null), 10000);
+  };
+
+  const dismissBanner = () => {
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    setNotifBanner(null);
+  };
+
+  // Detect rate-limit / quota errors from Gemini or other APIs
+  const isRateLimitError = (msg: string): boolean => {
+    const lower = msg.toLowerCase();
+    return (
+      lower.includes('rate limit') ||
+      lower.includes('rate_limit') ||
+      lower.includes('quota') ||
+      lower.includes('resource_exhausted') ||
+      lower.includes('too many requests') ||
+      lower.includes('429') ||
+      lower.includes('overloaded') ||
+      lower.includes('model is overloaded') ||
+      lower.includes('try again later')
+    );
+  };
 
   // Helper function to trigger beautiful, copyable full-scanned custom alerts
   const triggerAlert = (
@@ -756,8 +792,13 @@ export default function App() {
     } catch (err: any) {
       console.error(err);
       await createSystemLog(user.uid, 'error', `Polling event error: ${err.message || err}`);
-      const { message, technicalDetails } = parseErrorDetails(err.message || String(err));
-      triggerAlert('error', 'Captioning Polling Failure', message, technicalDetails);
+      const rawMsg = err.message || String(err);
+      if (isRateLimitError(rawMsg)) {
+        triggerBanner('⚡ AI rate limit reached — the model is temporarily busy. This usually resolves in a minute. Your files are safe, no action needed.');
+      } else {
+        const { message, technicalDetails } = parseErrorDetails(rawMsg);
+        triggerAlert('error', 'Captioning Polling Failure', message, technicalDetails);
+      }
     } finally {
       setIsPolling(false);
       setIsProcessing(false);
@@ -931,8 +972,13 @@ export default function App() {
 
     } catch (err: any) {
       console.error(err);
-      const { message, technicalDetails } = parseErrorDetails(err.message || String(err));
-      triggerAlert('error', 'Caption Regeneration Failed', message, technicalDetails);
+      const rawMsg = err.message || String(err);
+      if (isRateLimitError(rawMsg)) {
+        triggerBanner('⚡ AI rate limit reached — please wait a moment before regenerating captions.');
+      } else {
+        const { message, technicalDetails } = parseErrorDetails(rawMsg);
+        triggerAlert('error', 'Caption Regeneration Failed', message, technicalDetails);
+      }
     } finally {
       setIsRegenerating(false);
     }
@@ -1587,6 +1633,30 @@ export default function App() {
           onSave={handleCropSave}
           onCancel={() => setIsCropping(false)}
         />
+      )}
+
+      {/* Non-blocking Rate Limit / Info Banner */}
+      {notifBanner && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="fixed top-0 left-0 right-0 z-[60] flex items-center gap-3 px-4 py-3 bg-amber-950/95 border-b border-amber-500/40 backdrop-blur-sm shadow-2xl animate-slide-down"
+        >
+          <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+          <p className="flex-1 text-xs font-medium text-amber-100 leading-relaxed">
+            {notifBanner.message}
+            {notifBanner.retryAt && (
+              <span className="ml-2 text-amber-400 font-semibold">Retry at: {notifBanner.retryAt}</span>
+            )}
+          </p>
+          <button
+            onClick={dismissBanner}
+            aria-label="Dismiss notification"
+            className="p-1 rounded-md hover:bg-amber-800/50 text-amber-300 hover:text-white transition shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
       {/* Custom Expandable Toast / Alert Dialog */}

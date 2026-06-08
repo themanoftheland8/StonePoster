@@ -296,10 +296,14 @@ export default function App() {
   // Downscale a base64 image data-URI using client-side canvas
   const downscaleBase64Image = (base64Str: string, maxDim = 1024, quality = 0.8): Promise<string> => {
     return new Promise((resolve) => {
-      if (!base64Str || !base64Str.startsWith('data:image/') || base64Str.length < 200000) {
+      if (!base64Str || !base64Str.startsWith('data:image/')) {
         resolve(base64Str);
         return;
       }
+
+      // If the base64 is already small enough, we can preserve it as-is if dimensions are fine.
+      // But we must check that it is also short enough to fit Firestore.
+      const isShortEnough = base64Str.length < 600000;
 
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -309,20 +313,25 @@ export default function App() {
           let width = img.width;
           let height = img.height;
 
-          if (width <= maxDim && height <= maxDim) {
+          // If the image is already within acceptable dimension boundaries AND is short enough for Firestore, return it
+          if (width <= maxDim && height <= maxDim && isShortEnough) {
             resolve(base64Str);
             return;
           }
 
-          if (width > height) {
-            if (width > maxDim) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            }
-          } else {
-            if (height > maxDim) {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
+          // Otherwise, calculate new scaled dimensions
+          let targetMax = maxDim;
+          if (base64Str.length > 2000000) {
+            targetMax = Math.min(targetMax, 800);
+          }
+
+          if (width > targetMax || height > targetMax) {
+            if (width > height) {
+              height = Math.round((height * targetMax) / width);
+              width = targetMax;
+            } else {
+              width = Math.round((width * targetMax) / height);
+              height = targetMax;
             }
           }
 
@@ -335,18 +344,50 @@ export default function App() {
             return;
           }
 
+          // Draw image on canvas (transparent background defaults to solid black/white on JPEG translation)
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, width, height);
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Get original mime type
-          const matchMime = base64Str.match(/data:([^;]+);/);
-          const originalMime = matchMime ? matchMime[1] : 'image/jpeg';
-          const outputMime = originalMime.includes('png') || originalMime.includes('webp') ? originalMime : 'image/jpeg';
+          // Force JPEG compression to keep bytes tiny. Lossless PNG and WEBP ignore quality levels and bloat Firestore.
+          let resBase64 = canvas.toDataURL('image/jpeg', quality);
 
-          const resBase64 = canvas.toDataURL(outputMime, quality);
+          // Highly recursive/iterative fallback: if still exceeding a safe Firestore character capacity, step down
+          let attempts = 0;
+          let currentQuality = quality;
+          let currentDim = targetMax;
+
+          while (resBase64.length > 700000 && attempts < 3) {
+            attempts++;
+            currentQuality = Math.max(0.3, currentQuality - 0.2);
+            currentDim = Math.round(currentDim * 0.75);
+
+            let w = img.width;
+            let h = img.height;
+            if (w > h) {
+              h = Math.round((h * currentDim) / w);
+              w = currentDim;
+            } else {
+              w = Math.round((w * currentDim) / h);
+              h = currentDim;
+            }
+
+            canvas.width = w;
+            canvas.height = h;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resBase64 = canvas.toDataURL('image/jpeg', currentQuality);
+          }
+
+          // If standard JPEG format is somehow larger than raw input (e.g. extremely tiny image), keep the original
           if (resBase64.length < base64Str.length) {
             resolve(resBase64);
-          } else {
+          } else if (isShortEnough) {
             resolve(base64Str);
+          } else {
+            // Force return the smaller one
+            resolve(resBase64);
           }
         } catch (err) {
           console.error('Failed to downscale base64 image on canvas:', err);
@@ -476,7 +517,7 @@ export default function App() {
       let fileUrlData = analyzedOutput.imageUrl;
 
       // Downscale image if too large (e.g. from high resolution Drive sync) before saving to Firestore
-      if (selectedFile.mimeType.startsWith('image/')) {
+      if (fileUrlData.startsWith('data:image/')) {
         fileUrlData = await downscaleBase64Image(fileUrlData);
       }
 
@@ -593,7 +634,7 @@ export default function App() {
       let imageUrl = analyzedOutput.imageUrl;
 
       // Downscale returning analyze image if it is too massive before committing to Firestore
-      if (file.type.startsWith('image/')) {
+      if (imageUrl.startsWith('data:image/')) {
         imageUrl = await downscaleBase64Image(imageUrl);
       }
 

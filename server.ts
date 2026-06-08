@@ -135,10 +135,41 @@ app.post(['/api/posts/analyze-gdrive', '/api/posts/analyze-gdrive/'], async (req
     const outputText = geminiRes.text || '';
     const captions = cleanAndParseJSON(outputText);
 
+    // Formulate a compact preview image URL for the front-end (especially videos or huge images)
+    let returnedImageUrl = `data:${safeMimeType};base64,${base64Data}`;
+
+    if (safeMimeType.startsWith('video/')) {
+      try {
+        // Query Google Drive for the thumbnail of this video file
+        const metaUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=thumbnailLink`;
+        const metaRes = await fetch(metaUrl, {
+          headers: { Authorization: `Bearer ${gdriveToken}` },
+        });
+        if (metaRes.ok) {
+          const metaJson: any = await metaRes.json();
+          if (metaJson.thumbnailLink) {
+            // Google Drive's thumbnailLink contains a public, fast CDN image proxy
+            const thumbRes = await fetch(metaJson.thumbnailLink);
+            if (thumbRes.ok) {
+              const thumbBuf = await thumbRes.arrayBuffer();
+              returnedImageUrl = `data:image/jpeg;base64,${Buffer.from(thumbBuf).toString('base64')}`;
+            }
+          }
+        }
+      } catch (thumbErr) {
+        console.error('Google Drive thumbnail retrieval warning:', thumbErr);
+      }
+
+      // If resolving the thumbnail fails, fall back to an elegant, stylized SVG playback card
+      if (returnedImageUrl.startsWith('data:video/')) {
+        returnedImageUrl = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="100%" height="100%" fill="%231c1917"/><circle cx="300" cy="200" r="40" fill="%23eab308"/><polygon points="288,180 320,200 288,220" fill="%230c0a09"/><text x="300" y="280" fill="%23f5f5f4" font-family="sans-serif" font-size="16" font-weight="bold" text-anchor="middle">Video Preview Ready</text><text x="300" y="310" fill="%2378716c" font-family="sans-serif" font-size="12" text-anchor="middle">Short clip scanned by Gemini</text></svg>`;
+      }
+    }
+
     res.json({
       success: true,
       captions,
-      imageUrl: `data:${safeMimeType};base64,${base64Data}`,
+      imageUrl: returnedImageUrl,
     });
 
   } catch (error: any) {

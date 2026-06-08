@@ -24,7 +24,7 @@ import {
 import { db, auth, handleFirestoreError, OperationType } from './lib/firebase';
 import { UserConfig, PostItem, LogItem } from './types';
 import ConfigManager from './components/ConfigManager';
-import PhoneSimulator from './components/PhoneSimulator';
+import ImageCropper from './components/ImageCropper';
 import ManualUploadCard from './components/ManualUploadCard';
 import { versionInfo } from './version';
 
@@ -47,6 +47,11 @@ import {
   Copy,
   AlertCircle,
   AlertTriangle,
+  Crop,
+  Eye,
+  Share2,
+  MessageSquare,
+  Check,
 } from 'lucide-react';
 
 export default function App() {
@@ -60,6 +65,19 @@ export default function App() {
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [activePost, setActivePost] = useState<PostItem | null>(null);
+
+  // States for active draft review and photo cropping
+  const [isCropping, setIsCropping] = useState(false);
+  const [editedCaption, setEditedCaption] = useState('');
+  const [selectedIdx, setSelectedIdx] = useState(0);
+
+  useEffect(() => {
+    if (activePost) {
+      const idx = activePost.captions.indexOf(activePost.selectedCaption);
+      setSelectedIdx(idx !== -1 ? idx : 0);
+      setEditedCaption(activePost.selectedCaption || activePost.captions[0] || '');
+    }
+  }, [activePost?.id]);
 
   // Loading/Spinners
   const [isPolling, setIsPolling] = useState(false);
@@ -625,6 +643,28 @@ export default function App() {
     } finally {
       setIsPolling(false);
       setIsProcessing(false);
+    }
+  };
+
+  // Crop Photo: Update both Firestore and local state with the cropped image Data URL
+  const handleCropSave = async (croppedDataUrl: string) => {
+    if (!activePost || !user) return;
+    setIsCropping(false);
+
+    const updatedNode: PostItem = {
+      ...activePost,
+      imageUrl: croppedDataUrl,
+    };
+
+    try {
+      await setDoc(doc(db, `users/${user.uid}/posts`, activePost.id), updatedNode);
+      setPosts(prev => prev.map(p => (p.id === activePost.id ? updatedNode : p)));
+      setActivePost(updatedNode);
+      await createSystemLog(user.uid, 'success', `Cropped photo '${activePost.fileName}' successfully.`);
+    } catch (err: any) {
+      console.error(err);
+      await createSystemLog(user.uid, 'error', `Failed saving cropped photo: ${err.message || err}`);
+      triggerAlert('error', 'Cropping Save Failed', err.message || String(err));
     }
   };
 
@@ -1214,19 +1254,6 @@ export default function App() {
 
               </div>
 
-              {/* Right Column: Interactive Immersive Smartphone Preview */}
-              <div className="lg:col-span-4 flex justify-center">
-                <PhoneSimulator
-                  activePost={activePost}
-                  onSelectCaption={handleSelectCaption}
-                  onRegenerate={handleRegenerateCaptions}
-                  onPublish={handlePublishContent}
-                  onSkip={handleSkipProposal}
-                  isPublishing={isPublishing}
-                  isRegenerating={isRegenerating}
-                />
-              </div>
-
             </div>
           )}
 
@@ -1295,6 +1322,15 @@ export default function App() {
           </span>
         </div>
       </footer>
+
+      {/* Image Cropper Modal */}
+      {isCropping && activePost?.imageUrl && (
+        <ImageCropper
+          imageUrl={activePost.imageUrl}
+          onSave={handleCropSave}
+          onCancel={() => setIsCropping(false)}
+        />
+      )}
 
       {/* Custom Expandable Toast / Alert Dialog */}
       {customAlert && (

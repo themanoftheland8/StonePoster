@@ -1160,100 +1160,258 @@ export default function App() {
 
           {/* ACTIVE WORKSPACE AREA */}
           {activeTab === 'dashboard' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              
-              {/* Left Column: Action Hub */}
-              <div className="lg:col-span-8 space-y-6">
-                
-                {/* Visual workflow banner */}
-                <div className="glass-premium rounded-3xl p-6 text-white overflow-hidden relative shadow-lg">
-                  <div className="absolute right-0 top-0 translate-x-12 -translate-y-6 opacity-5 blur-xl w-72 h-72 rounded-full bg-brand-gold" />
-                  
-                  <div className="relative space-y-3 max-w-lg">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-brand-gold font-mono flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-brand-gold" /> Auto-Scheduler Node
-                    </span>
-                    <h2 className="font-display font-medium text-2xl tracking-tight leading-none text-text-main sm:text-3xl">
-                      Trigger Immediate Polling
-                    </h2>
-                    <p className="text-xs text-text-muted leading-relaxed">
-                      Check your designated Google Drive folder space, download a random unposted photo/video, generate 3 smart caption ideas with Gemini 3.5, and alert your device!
-                    </p>
+            <div className="space-y-6">
 
-                    <div className="pt-2 flex flex-wrap gap-2.5">
-                      <button
-                        onClick={handlePollAndPickRandom}
-                        disabled={isPolling || isProcessing}
-                        className="px-5 py-3 btn-gold font-bold text-xs rounded-xl disabled:opacity-50 transition duration-150 flex items-center gap-1.5 uppercase shadow-sm cursor-pointer"
-                      >
-                        {isPolling ? 'Scanning Drive...' : 'Poll & Pick Random File'}
-                      </button>
+              {/* ── FEATURED DRAFT REVIEW PANEL ── shows at top when a draft is active */}
+              {activePost ? (
+                <div className="glass rounded-2xl overflow-hidden border border-brand-gold/25 shadow-xl">
+                  {/* Panel header */}
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-brand-gold/15 bg-black/40">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                      <span className="text-xs font-bold font-mono uppercase tracking-wider text-brand-gold">
+                        Draft Pending Review
+                      </span>
+                      <span className="text-[10px] text-stone-500 font-mono truncate max-w-[160px] hidden sm:block">
+                        — {activePost.fileName}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setActivePost(null)}
+                      className="text-[10px] text-stone-500 hover:text-stone-300 font-semibold transition cursor-pointer px-2 py-1 rounded-lg hover:bg-white/5"
+                    >
+                      Dismiss ✕
+                    </button>
+                  </div>
+
+                  {/* Two-column body: photo left, controls right */}
+                  <div className="flex flex-col md:flex-row">
+
+                    {/* LEFT: Photo preview */}
+                    <div className="relative md:w-1/2 bg-black flex items-center justify-center min-h-[260px] overflow-hidden">
+                      <img
+                        src={activePost.imageUrl}
+                        alt={activePost.fileName}
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-contain max-h-[480px]"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                      {/* Crop button */}
+                      {activePost.mimeType?.startsWith('image/') && (
+                        <button
+                          onClick={() => setIsCropping(true)}
+                          className="absolute top-3 right-3 px-3 py-1.5 bg-black/70 hover:bg-black/90 backdrop-blur-sm border border-brand-gold/30 text-brand-gold text-[11px] font-bold rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Crop className="w-3.5 h-3.5" /> Crop Photo
+                        </button>
+                      )}
+                    </div>
+
+                    {/* RIGHT: Caption controls */}
+                    <div className="md:w-1/2 flex flex-col p-5 space-y-5 overflow-y-auto max-h-[480px] no-scrollbar">
+
+                      {/* Caption Options */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-gold flex items-center gap-1.5">
+                            <Sparkles className="w-3 h-3" /> Caption Options
+                          </span>
+                          <button
+                            onClick={handleRegenerateCaptions}
+                            disabled={isRegenerating}
+                            className="text-[10px] text-stone-400 hover:text-brand-gold font-semibold transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <RotateCw className={`w-3 h-3 ${isRegenerating ? 'animate-spin' : ''}`} />
+                            {isRegenerating ? 'Regenerating...' : 'Regenerate All'}
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {activePost.captions.map((cap, i) => (
+                            <div
+                              key={i}
+                              onClick={() => {
+                                setSelectedIdx(i);
+                                setEditedCaption(cap);
+                                handleSelectCaption(cap);
+                              }}
+                              className={`p-3 rounded-xl border cursor-pointer transition ${
+                                selectedIdx === i
+                                  ? 'bg-brand-gold/10 border-brand-gold/50'
+                                  : 'bg-black/30 border-stone-800 hover:border-brand-gold/30'
+                              }`}
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <span className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition ${selectedIdx === i ? 'bg-brand-gold border-brand-gold' : 'border-stone-600'}`}>
+                                  {selectedIdx === i && <Check className="w-2.5 h-2.5 text-stone-950" />}
+                                </span>
+                                <div className="min-w-0">
+                                  <span className="text-[9px] text-brand-gold/70 font-bold font-mono block mb-0.5">OPTION {i + 1}</span>
+                                  <p className="text-xs text-text-main leading-relaxed">{cap}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Caption editor */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-gold flex items-center gap-1.5">
+                          <MessageSquare className="w-3 h-3" /> Edit Caption
+                        </label>
+                        <textarea
+                          value={editedCaption}
+                          onChange={(e) => {
+                            setEditedCaption(e.target.value);
+                            handleSelectCaption(e.target.value);
+                          }}
+                          rows={4}
+                          className="w-full bg-black/50 border border-brand-gold/15 focus:border-brand-gold/40 text-text-main text-xs rounded-xl px-4 py-3 outline-none resize-none transition font-sans placeholder:text-stone-600 focus:ring-1 focus:ring-brand-gold/20 leading-relaxed"
+                          placeholder="Edit your caption before posting..."
+                        />
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        <button
+                          onClick={handleSkipProposal}
+                          className="py-3 bg-stone-900 border border-stone-700 hover:border-red-500/40 hover:bg-red-950/20 text-stone-400 hover:text-red-400 text-xs font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Skip Draft
+                        </button>
+                        <button
+                          onClick={() => handlePublishContent(editedCaption)}
+                          disabled={isPublishing}
+                          className="py-3 btn-gold text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          <Share2 className="w-4 h-4" />
+                          {isPublishing ? 'Publishing...' : 'Publish Now'}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-stone-600 text-center">Publishes simultaneously to X & Bluesky</p>
+
                     </div>
                   </div>
                 </div>
-
-                {/* Manual Local Content Upload */}
-                <ManualUploadCard onUpload={handleManualUploadFlow} isProcessing={isProcessing} />
-
-                {/* Queue History */}
-                <div className="glass rounded-2xl p-6 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between border-b border-brand-gold/10 pb-3">
-                    <div className="flex items-center gap-2.5">
-                      <History className="w-5 h-5 text-brand-gold" />
-                      <h3 className="font-display font-medium text-text-main text-sm">Processed Assets History</h3>
+              ) : (
+                /* No active draft: subtle prompt banner */
+                <div className="glass rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-4 justify-between border border-brand-gold/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-brand-gold/10 text-brand-gold flex items-center justify-center shrink-0">
+                      <Eye className="w-5 h-5" />
                     </div>
-                    <span className="text-xs font-mono bg-black/40 text-brand-gold px-2.5 py-1 rounded-full border border-brand-gold/15">{posts.length} entries</span>
+                    <div>
+                      <p className="text-sm font-semibold text-text-main">No draft pending review</p>
+                      <p className="text-xs text-text-muted">Poll your Drive folder or upload a photo below to get started.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handlePollAndPickRandom}
+                    disabled={isPolling || isProcessing}
+                    className="px-5 py-2.5 btn-gold font-bold text-xs rounded-xl disabled:opacity-50 transition shrink-0 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {isPolling ? 'Scanning...' : 'Poll Drive Now'}
+                  </button>
+                </div>
+              )}
+
+              {/* ── ACTION HUB: Poll banner + Upload + History ── always shown below */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                {/* Left: Poll banner + Upload */}
+                <div className="lg:col-span-7 space-y-6">
+
+                  {/* Visual workflow banner */}
+                  <div className="glass-premium rounded-3xl p-6 text-white overflow-hidden relative shadow-lg">
+                    <div className="absolute right-0 top-0 translate-x-12 -translate-y-6 opacity-5 blur-xl w-72 h-72 rounded-full bg-brand-gold" />
+                    <div className="relative space-y-3 max-w-lg">
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-brand-gold font-mono flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-brand-gold" /> Auto-Scheduler Node
+                      </span>
+                      <h2 className="font-display font-medium text-2xl tracking-tight leading-none text-text-main sm:text-3xl">
+                        Trigger Immediate Polling
+                      </h2>
+                      <p className="text-xs text-text-muted leading-relaxed">
+                        Scan your Google Drive folder, pick a random unposted photo or video, and generate 3 Gemini-powered caption ideas.
+                      </p>
+                      <div className="pt-2">
+                        <button
+                          onClick={handlePollAndPickRandom}
+                          disabled={isPolling || isProcessing}
+                          className="px-5 py-3 btn-gold font-bold text-xs rounded-xl disabled:opacity-50 transition flex items-center gap-1.5 uppercase shadow-sm cursor-pointer"
+                        >
+                          {isPolling ? 'Scanning Drive...' : 'Poll & Pick Random File'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  {posts.length === 0 ? (
-                    <div className="py-12 text-center text-text-muted text-xs">
-                      No posts processed yet. Scan Google Drive directory to make selections.
+                  {/* Manual upload */}
+                  <ManualUploadCard onUpload={handleManualUploadFlow} isProcessing={isProcessing} />
+
+                </div>
+
+                {/* Right: History */}
+                <div className="lg:col-span-5">
+                  <div className="glass rounded-2xl p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-brand-gold/10 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <History className="w-5 h-5 text-brand-gold" />
+                        <h3 className="font-display font-medium text-text-main text-sm">Processed Assets</h3>
+                      </div>
+                      <span className="text-xs font-mono bg-black/40 text-brand-gold px-2.5 py-1 rounded-full border border-brand-gold/15">{posts.length} entries</span>
                     </div>
-                  ) : (
-                    <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1 no-scrollbar">
-                      {posts.map((post) => (
-                        <div
-                          key={post.id}
-                          className="flex items-center gap-4 p-3 bg-black/25 hover:bg-black/40 border border-brand-gold/5 hover:border-brand-gold/15 rounded-xl transition"
-                        >
-                          <img
-                            src={post.imageUrl}
-                            alt={post.fileName}
-                            referrerPolicy="no-referrer"
-                            className="w-12 h-12 rounded-lg object-cover bg-stone-900 shrink-0 border border-brand-gold/10"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-xs font-semibold text-text-main truncate">{post.fileName}</h4>
-                            <p className="text-[10px] text-text-muted truncate mt-0.5">{post.selectedCaption || 'No selected caption...'}</p>
+
+                    {posts.length === 0 ? (
+                      <div className="py-10 text-center text-text-muted text-xs">
+                        No posts processed yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 no-scrollbar">
+                        {posts.map((post) => (
+                          <div
+                            key={post.id}
+                            className={`flex items-center gap-3 p-3 border rounded-xl transition cursor-pointer ${
+                              activePost?.id === post.id
+                                ? 'bg-brand-gold/10 border-brand-gold/40'
+                                : 'bg-black/25 hover:bg-black/40 border-brand-gold/5 hover:border-brand-gold/15'
+                            }`}
+                            onClick={() => post.status === 'pending_review' ? setActivePost(post) : undefined}
+                          >
+                            <img
+                              src={post.imageUrl}
+                              alt={post.fileName}
+                              referrerPolicy="no-referrer"
+                              className="w-11 h-11 rounded-lg object-cover bg-stone-900 shrink-0 border border-brand-gold/10"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-xs font-semibold text-text-main truncate">{post.fileName}</h4>
+                              <p className="text-[10px] text-text-muted truncate mt-0.5">{post.selectedCaption || 'No caption...'}</p>
+                            </div>
+                            <div className="shrink-0">
+                              {post.status === 'posted' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-500/30">
+                                  <CheckCircle className="w-3 h-3" /> Posted
+                                </span>
+                              ) : post.status === 'skipped' ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-950/40 text-red-300 border border-red-500/30">
+                                  <XCircle className="w-3 h-3" /> Skipped
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/40 text-amber-300 border border-amber-500/30">
+                                  Review
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          
-                          {/* Badge Status */}
-                          <div className="shrink-0">
-                            {post.status === 'posted' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-500/30">
-                                <CheckCircle className="w-3 h-3 text-emerald-400" /> Posted
-                              </span>
-                            ) : post.status === 'skipped' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-950/40 text-red-300 border border-red-500/30">
-                                <XCircle className="w-3 h-3 text-red-400" /> Skipped
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => setActivePost(post)}
-                                className="px-3 py-1 btn-gold-outline text-[10px] font-bold rounded-lg transition text-xs cursor-pointer"
-                              >
-                                Review Draft
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
               </div>
-
             </div>
           )}
 

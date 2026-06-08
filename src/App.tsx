@@ -627,7 +627,7 @@ export default function App() {
 
   // Run auto-poll if countdown reaches 0 to mock automated background routine
   const triggerAutoPoll = async () => {
-    if (!user || isPolling || isProcessing || !config?.isPollingActive) return;
+    if (!user || !gdriveToken || isPolling || isProcessing || !config?.isPollingActive) return;
     await createSystemLog(user.uid, 'info', 'Preset random interval has concluded. Triggering automated content pull...');
     await handlePollAndPickRandom();
   };

@@ -541,7 +541,6 @@ export const api = onRequest({
   cors: true,
   timeoutSeconds: 120,
   memory: '256MiB',
-  secrets: ['GEMINI_API_KEY'],
 }, app);
 
 // Only start the Express listener during local standalone development

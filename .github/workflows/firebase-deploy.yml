@@ -29,6 +29,11 @@ jobs:
         run: |
           echo "export const versionInfo = { version: '1.0.${{ github.run_number }}', sha: '$(echo "${{ github.sha }}" | cut -c1-7)', timestamp: '$(date -u +'%Y-%m-%dT%H:%M:%SZ')' };" > src/version.ts
 
+      - name: Create Environment File
+        run: |
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env
+          echo "APP_URL=https://twittertry2-8a870.web.app" >> .env
+
       - name: Build Application
         run: npm run build
         env:

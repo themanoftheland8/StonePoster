@@ -25,6 +25,7 @@ export default function ConfigManager({ config, onSave, isLoading }: ConfigManag
     twitterEnabled: config.twitterEnabled ?? false,
     webhookUrl: config.webhookUrl || '',
     webhookEnabled: config.webhookEnabled ?? false,
+    backendUrl: config.backendUrl || '',
   });
 
   const [activeTab, setActiveTab] = useState<'drive' | 'bluesky' | 'twitter' | 'notifications'>('drive');
@@ -67,7 +68,7 @@ export default function ConfigManager({ config, onSave, isLoading }: ConfigManag
             }`}
           >
             <Database className="w-4 h-4" />
-            Google Drive Settings
+            Drive & Server API
           </button>
           <button
             type="button"
@@ -127,6 +128,27 @@ export default function ConfigManager({ config, onSave, isLoading }: ConfigManag
                   placeholder="e.g. 1hsvMRVzXYXjadHot1PyV6jUEEKC9MeY4"
                   className="w-full text-sm bg-black/35 text-text-main border-brand-gold/15 border rounded-xl px-3.5 py-2.5 focus:border-brand-gold focus:ring-1 focus:ring-brand-gold outline-none transition-all font-mono"
                 />
+              </div>
+
+              <div className="border-t border-brand-gold/10 pt-4 space-y-2">
+                <h3 className="text-sm font-semibold text-text-main font-display">Remote Backend API URL</h3>
+                <p className="text-xs text-text-muted leading-relaxed">
+                  When deployed statically to web hosting platforms (e.g., Firebase Hosting), the client must point to a live containerized server to proxy Drive & Gemini requests.
+                </p>
+                <div>
+                  <label className="block text-xs font-semibold text-brand-gold mb-1">DEDICATED SERVICE ENDPOINT</label>
+                  <input
+                    type="text"
+                    name="backendUrl"
+                    value={formData.backendUrl}
+                    onChange={handleChange}
+                    placeholder="e.g. https://ais-pre-ers6nylkkq3olbv6aomyji-174790136982.us-west2.run.app"
+                    className="w-full text-sm bg-black/35 text-text-main border-brand-gold/15 border rounded-xl px-3.5 py-2.5 focus:border-brand-gold focus:ring-1 focus:ring-brand-gold outline-none transition-all font-mono text-xs"
+                  />
+                  <div className="mt-1 text-[10px] text-text-muted font-sans flex items-center gap-1">
+                    <span>💡 Leaving this blank uses local relative routing inside the AI Studio container development environment.</span>
+                  </div>
+                </div>
               </div>
 
               <div className="bg-black/40 rounded-xl p-4 border border-brand-gold/10 text-xs text-text-muted space-y-2">

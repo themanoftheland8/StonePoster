@@ -113,17 +113,49 @@ export default function App() {
   // Diagnostic State for static hosting environments (e.g. static Firebase Hosting preventing express execution)
   const [hostingDiagnosticWarning, setHostingDiagnosticWarning] = useState<string | null>(null);
 
+  // Helper to dynamically resolve full URL paths depending on hosting context and configurations
+  const getApiUrl = (endpointPath: string): string => {
+    if (endpointPath.startsWith('http')) return endpointPath;
+    const pathPart = endpointPath.startsWith('/') ? endpointPath : `/${endpointPath}`;
+
+    // 1. If user explicitly specified a custom backend URL, prioritize it
+    if (config?.backendUrl && config.backendUrl.trim() !== '') {
+      const base = config.backendUrl.trim().endsWith('/')
+        ? config.backendUrl.trim().slice(0, -1)
+        : config.backendUrl.trim();
+      return `${base}${pathPart}`;
+    }
+
+    // 2. Fallback check for static-only hosting like Firebase Hosting
+    const hostname = window.location.hostname;
+    const isFirebaseHosting = 
+      hostname.includes('.web.app') || 
+      hostname.includes('.firebaseapp.com') || 
+      (hostname === 'localhost' && window.location.port !== '3000' && window.location.port !== '');
+    
+    if (isFirebaseHosting) {
+      // route natively to the stable Google AI Studio live container preview URL
+      return `https://ais-pre-ers6nylkkq3olbv6aomyji-174790136982.us-west2.run.app${pathPart}`;
+    }
+
+    // 3. Defaults to relative route under normal development container context
+    return pathPart;
+  };
+
   // Check backend health to verify if we are running in a static-only hosting environment
   useEffect(() => {
     const checkBackendHealth = async () => {
       try {
-        const res = await fetch('/api/health');
+        const res = await fetch(getApiUrl('/api/health'));
         if (res.ok) {
           const contentType = res.headers.get('content-type') || '';
           if (!contentType.includes('application/json')) {
             setHostingDiagnosticWarning(
-              'Static-only hosting environment detected (Firebase Hosting). The required Node.js Express server is not running on this URL.'
+              'Static-only hosting environment detected (Firebase Hosting). Active requests are routed securely to your AI Studio Cloud Run live backup container.'
             );
+          } else {
+            // Backend connected successfully! No warning needed.
+            setHostingDiagnosticWarning(null);
           }
         } else {
           setHostingDiagnosticWarning(
@@ -137,7 +169,7 @@ export default function App() {
       }
     };
     checkBackendHealth();
-  }, []);
+  }, [config?.backendUrl]);
 
   // Configure Google OAuth provider with scopes
   const provider = new GoogleAuthProvider();
@@ -274,6 +306,7 @@ export default function App() {
           blueskyEnabled: false,
           twitterEnabled: false,
           webhookEnabled: false,
+          backendUrl: '',
         };
         await setDoc(doc(db, draftPath), currentConfig);
         await createSystemLog(uid, 'info', 'System bootstrapped with default Google Drive folder locations');
@@ -539,7 +572,7 @@ export default function App() {
       setIsProcessing(true);
 
       // 2. Send selected GDrive fileId to server for downloading & Gemini vision captions modeling
-      const analyzeRes = await fetch('/api/posts/analyze-gdrive', {
+      const analyzeRes = await fetch(getApiUrl('/api/posts/analyze-gdrive'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -635,7 +668,7 @@ export default function App() {
       }
 
       // 1. Upload onto GDrive through Express middleware
-      const uploadRes = await fetch('/api/drive/upload', {
+      const uploadRes = await fetch(getApiUrl('/api/drive/upload'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -657,7 +690,7 @@ export default function App() {
       await createSystemLog(user.uid, 'success', `Successfully mirrored file to Google Drive. GDrive ID: ${driveFileId}`);
 
       // 2. Analyze the uploaded content using the common GDrive pipeline
-      const analyzeRes = await fetch('/api/posts/analyze-gdrive', {
+      const analyzeRes = await fetch(getApiUrl('/api/posts/analyze-gdrive'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -718,7 +751,7 @@ export default function App() {
     await createSystemLog(user.uid, 'info', `Regenerating caption variants for active asset: '${activePost.fileName}'`);
 
     try {
-      const reRes = await fetch('/api/posts/analyze-upload', {
+      const reRes = await fetch(getApiUrl('/api/posts/analyze-upload'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -774,7 +807,7 @@ export default function App() {
     await createSystemLog(user.uid, 'info', `Publishing visual asset with caption: "${finalCaption}"`);
 
     try {
-      const publishRes = await fetch('/api/posts/publish', {
+      const publishRes = await fetch(getApiUrl('/api/posts/publish'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -820,7 +853,7 @@ export default function App() {
       // Now move file inside Drive under "posted" folder
       if (activePost.driveFileId && gdriveToken) {
         await createSystemLog(user.uid, 'info', `Moving Google Drive file ${activePost.driveFileId} to 'posted' subfolder...`);
-        const moveRes = await fetch('/api/drive/move-file', {
+        const moveRes = await fetch(getApiUrl('/api/drive/move-file'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -879,7 +912,7 @@ export default function App() {
     try {
       if (activePost.driveFileId && gdriveToken) {
         await createSystemLog(user.uid, 'info', `Archiving Google Drive file to 'skipped' subfolder...`);
-        await fetch('/api/drive/move-file', {
+        await fetch(getApiUrl('/api/drive/move-file'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

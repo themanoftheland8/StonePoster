@@ -14,6 +14,7 @@ export interface UserConfig {
   twitterEnabled: boolean;
   webhookUrl?: string;
   webhookEnabled: boolean;
+  backendUrl?: string;
   updatedAt?: number;
 }
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
+import { onRequest } from 'firebase-functions/v2/https';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { TwitterApi } from 'twitter-api-v2';
@@ -535,4 +536,14 @@ async function startServer() {
   });
 }
 
-startServer();
+// Export the Express app as a Firebase Cloud Function
+export const api = onRequest({
+  cors: true,
+  timeoutSeconds: 120,
+  memory: '256MiB',
+}, app);
+
+// Only start the Express listener during local standalone development
+if (!process.env.FIREBASE_CONFIG) {
+  startServer();
+}

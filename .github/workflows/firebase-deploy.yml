@@ -34,19 +34,20 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Deploy to Firebase Hosting (Standard Service Account)
+      - name: Authenticate to Google Cloud
         if: ${{ env.SA_EXISTS != '' }}
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        uses: google-github-actions/auth@v2
         with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          channelId: live
-          projectId: twittertry2-8a870
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      # Fallback or alternative step to deploy and update Firestore Security Rules as well
-      - name: Deploy Rules & Hosting via Firebase CLI Token
-        if: ${{ env.TOKEN_EXISTS != '' }}
-        run: npx firebase-tools deploy --only hosting,firestore --project twittertry2-8a870 --token "$FIREBASE_TOKEN"
+      - name: Deploy to Firebase via Service Account (Hosting, Firestore, Functions)
+        if: ${{ env.SA_EXISTS != '' }}
+        run: npx firebase-tools deploy --project twittertry2-8a870
+
+      # Fallback or alternative step to deploy using Firebase Token
+      - name: Deploy via Firebase CLI Token
+        if: ${{ env.TOKEN_EXISTS != '' && env.SA_EXISTS == '' }}
+        run: npx firebase-tools deploy --project twittertry2-8a870 --token "$FIREBASE_TOKEN"
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 

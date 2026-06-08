@@ -126,19 +126,7 @@ export default function App() {
       return `${base}${pathPart}`;
     }
 
-    // 2. Fallback check for static-only hosting like Firebase Hosting
-    const hostname = window.location.hostname;
-    const isFirebaseHosting = 
-      hostname.includes('.web.app') || 
-      hostname.includes('.firebaseapp.com') || 
-      (hostname === 'localhost' && window.location.port !== '3000' && window.location.port !== '');
-    
-    if (isFirebaseHosting) {
-      // route natively to the stable Google AI Studio live container preview URL
-      return `https://ais-pre-ers6nylkkq3olbv6aomyji-174790136982.us-west2.run.app${pathPart}`;
-    }
-
-    // 3. Defaults to relative route under normal development container context
+    // 2. Defaults to relative route under normal development container or Firebase rewrite context
     return pathPart;
   };
 
@@ -151,7 +139,7 @@ export default function App() {
           const contentType = res.headers.get('content-type') || '';
           if (!contentType.includes('application/json')) {
             setHostingDiagnosticWarning(
-              'Static-only hosting environment detected (Firebase Hosting). Active requests are routed securely to your AI Studio Cloud Run live backup container.'
+              'Your Firebase Cloud Functions backend has not been deployed yet. Active API requests are falling back to static hosting rewrites.'
             );
           } else {
             // Backend connected successfully! No warning needed.
@@ -997,15 +985,17 @@ export default function App() {
           <div className="max-w-7xl mx-auto flex items-start gap-3 text-left">
             <Shield className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <span className="text-amber-300 font-semibold block">Static-Only Routing Detected:</span>
-              <p className="leading-relaxed text-amber-200/90">
-                You are currently running the application on a static hosting service (Firebase Hosting). 
-                Static hosts are designed for client-only files and, by default, rewrite backend API paths back to <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">index.html</code>. 
-                This causes endpoints like <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">/api/drive/upload</code> to return HTML content in HTTP 200 instead of a JSON response.
+              <span className="text-amber-300 font-semibold block">Cloud Functions Backend Pending Deployment:</span>
+              <p className="leading-relaxed text-amber-200/90 font-semibold">
+                {hostingDiagnosticWarning}
+              </p>
+              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                By default, static hosting rewrites all non-existent paths back to <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">index.html</code>. 
+                This causes backend API routes (e.g. <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">/api/health</code>, <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">/api/drive/upload</code>) to return static HTML content instead of JSON payload.
               </p>
               <p className="text-[11px] text-amber-400/90">
-                💡 <span className="font-semibold">How to resolve:</span> Access the application using your authorized <strong className="text-amber-300">Cloud Run Dev Preview Link</strong> in Google AI Studio. 
-                The Cloud Run Preview successfully hosts the full Node.js Express server to handle all server-side operations (Google Drive file writes, Gemini Vision prompts, and social publishing).
+                💡 <span className="font-semibold">How to resolve:</span> Open your terminal and run <strong className="text-amber-300">firebase deploy</strong>. 
+                This compiles your server files and deploys both the frontend and the Express API as a Firebase Cloud Function.
               </p>
             </div>
           </div>

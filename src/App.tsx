@@ -44,6 +44,9 @@ import {
   Smartphone,
   Shield,
   BookOpen,
+  Copy,
+  AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function App() {
@@ -67,6 +70,45 @@ export default function App() {
 
   // Counter
   const [countdownStr, setCountdownStr] = useState<string>('Not Scheduled');
+
+  // Custom Alert / Detailed Notification modal state
+  const [customAlert, setCustomAlert] = useState<{
+    type: 'success' | 'error' | 'info' | 'warning';
+    title: string;
+    message: string;
+    technicalDetails?: string;
+  } | null>(null);
+
+  // Helper function to trigger beautiful, copyable full-scanned custom alerts
+  const triggerAlert = (
+    type: 'success' | 'error' | 'info' | 'warning',
+    title: string,
+    message: string,
+    technicalDetails?: string
+  ) => {
+    setCustomAlert({ type, title, message, technicalDetails });
+  };
+
+  // Extract human-friendly error summary and separate out raw HTML block payloads
+  const parseErrorDetails = (errMsg: string) => {
+    let message = errMsg;
+    let technicalDetails = '';
+
+    const indexHtmlMarker = errMsg.indexOf('HTML block:');
+    const nonJsonMarker = errMsg.indexOf('received non-JSON');
+    
+    if (indexHtmlMarker !== -1) {
+      message = errMsg.substring(0, indexHtmlMarker).trim();
+      technicalDetails = errMsg.substring(indexHtmlMarker).trim();
+    } else if (nonJsonMarker !== -1) {
+      message = errMsg.substring(0, nonJsonMarker).trim();
+      technicalDetails = errMsg.substring(nonJsonMarker).trim();
+    } else if (errMsg.length > 250) {
+      message = errMsg.substring(0, 200) + '...';
+      technicalDetails = errMsg;
+    }
+    return { message, technicalDetails };
+  };
 
   // Diagnostic State for static hosting environments (e.g. static Firebase Hosting preventing express execution)
   const [hostingDiagnosticWarning, setHostingDiagnosticWarning] = useState<string | null>(null);
@@ -441,7 +483,7 @@ export default function App() {
     if (!user) return;
     if (!gdriveToken) {
       await createSystemLog(user.uid, 'error', 'Google authentication token expired. Please re-authenticate.');
-      alert('Please click Sign-in again to refresh your secure Google session.');
+      triggerAlert('warning', 'Session Refresh Required', 'Please click Sign-in again to refresh your secure Google session and update your Drive authentication token.');
       return;
     }
 
@@ -472,7 +514,7 @@ export default function App() {
 
       if (mediaItems.length === 0) {
         await createSystemLog(user.uid, 'info', 'No supportable image/video assets discovered in target folder');
-        alert(`We scanned Drive Folder [${config?.driveFolderId}] but found no image or video assets within our 15MB size limit. Please ensure your files are below 15MB each.`);
+        triggerAlert('info', 'No Compatible Assets Found', `We successfully scanned Drive Folder [${config?.driveFolderId}] but did not discover any image or short video files matching our 15MB size limit. Please verify the folder contains compatible files under 15MB.`);
         setIsPolling(false);
         return;
       }
@@ -557,7 +599,8 @@ export default function App() {
     } catch (err: any) {
       console.error(err);
       await createSystemLog(user.uid, 'error', `Polling event error: ${err.message || err}`);
-      alert(`Error during scanning & Captioning: ${err.message || err}`);
+      const { message, technicalDetails } = parseErrorDetails(err.message || String(err));
+      triggerAlert('error', 'Captioning Polling Failure', message, technicalDetails);
     } finally {
       setIsPolling(false);
       setIsProcessing(false);
@@ -568,7 +611,7 @@ export default function App() {
   const handleManualUploadFlow = async (file: File) => {
     if (!user) return;
     if (!gdriveToken) {
-      alert('Please connect Google Drive by signing in first.');
+      triggerAlert('warning', 'Google Authentication Expected', 'Please connect Google Drive by signing in first.');
       return;
     }
 
@@ -578,7 +621,7 @@ export default function App() {
     // Guard manual uploads against extremely large files that exceed proxy / browser limits
     const MAX_MANUAL_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
     if (file.size > MAX_MANUAL_SIZE_BYTES) {
-      alert(`The selected file is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please upload a file smaller than 10MB to optimize performance and prevent gateway timeouts.`);
+      triggerAlert('warning', 'File Size Limit Exceeded', `The selected file is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Please upload a file smaller than 10MB to optimize performance and prevent gateway timeouts.`);
       setIsProcessing(false);
       return;
     }
@@ -661,7 +704,8 @@ export default function App() {
     } catch (err: any) {
       console.error(err);
       await createSystemLog(user.uid, 'error', `Manual upload failure: ${err.message || err}`);
-      alert(`Local Upload Pipeline failed: ${err.message}`);
+      const { message, technicalDetails } = parseErrorDetails(err.message || String(err));
+      triggerAlert('error', 'Local Upload Pipeline Failed', message, technicalDetails);
     } finally {
       setIsProcessing(false);
     }
@@ -706,7 +750,8 @@ export default function App() {
 
     } catch (err: any) {
       console.error(err);
-      alert(`Regeneration failed: ${err.message}`);
+      const { message, technicalDetails } = parseErrorDetails(err.message || String(err));
+      triggerAlert('error', 'Caption Regeneration Failed', message, technicalDetails);
     } finally {
       setIsRegenerating(false);
     }
@@ -811,12 +856,13 @@ export default function App() {
         await createSystemLog(user.uid, 'info', `Rescheduled next automated polling loop for: ${new Date(nextTime).toLocaleTimeString()}`);
       }
 
-      alert('Content published successfully!');
+      triggerAlert('success', 'Asset Published', 'Your chosen caption alternative has been successfully synchronized and broadcast to social channels, and the Google Drive file compiled.');
 
     } catch (err: any) {
       console.error(err);
       await createSystemLog(user.uid, 'error', `Publish execution failure: ${err.message}`);
-      alert(`Sharing workflow failed: ${err.message}`);
+      const { message, technicalDetails } = parseErrorDetails(err.message || String(err));
+      triggerAlert('error', 'Publishing Pipeline Failed', message, technicalDetails);
     } finally {
       setIsPublishing(false);
     }
@@ -867,7 +913,8 @@ export default function App() {
 
     } catch (err: any) {
       console.error(err);
-      alert(`Failed skipping proposal: ${err?.message}`);
+      const { message, technicalDetails } = parseErrorDetails(err.message || String(err));
+      triggerAlert('error', 'Skip Proposal Archiving Failed', message, technicalDetails);
     }
   };
 
@@ -1225,6 +1272,111 @@ export default function App() {
           </span>
         </div>
       </footer>
+
+      {/* Custom Expandable Toast / Alert Dialog */}
+      {customAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm transition-all focus:outline-none" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') setCustomAlert(null); }}>
+          <div className="w-full max-w-2xl bg-stone-900 border border-brand-gold/35 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
+            
+            {/* Header */}
+            <div className={`px-6 py-4 flex items-center justify-between border-b shrink-0 ${
+              customAlert.type === 'error' ? 'border-red-500/20 bg-red-950/20' :
+              customAlert.type === 'warning' ? 'border-amber-500/20 bg-amber-950/20' :
+              customAlert.type === 'success' ? 'border-emerald-500/20 bg-emerald-950/20' :
+              'border-brand-gold/15 bg-black/40'
+            }`}>
+              <div className="flex items-center gap-3">
+                {customAlert.type === 'error' && <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />}
+                {customAlert.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />}
+                {customAlert.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />}
+                {customAlert.type === 'info' && <Shield className="w-5 h-5 text-brand-gold shrink-0" />}
+                <h3 className="font-display font-bold text-sm tracking-tight text-text-main uppercase">
+                  {customAlert.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setCustomAlert(null)}
+                className="p-1 px-2 text-[10px] uppercase tracking-wider font-extrabold rounded bg-black/40 hover:bg-black/70 text-text-muted hover:text-text-main transition border border-brand-gold/5 hover:border-brand-gold/20"
+              >
+                Close (Esc)
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              
+              {/* Short User-Facing Diagnostic message */}
+              <div className="text-sm font-medium text-text-main/90 leading-relaxed whitespace-pre-wrap">
+                {customAlert.message}
+              </div>
+
+              {/* Special Note for Static Routing if warning/error is related */}
+              {(customAlert.message?.includes('doctype html') || 
+                customAlert.message?.includes('HTML block') || 
+                customAlert.technicalDetails?.includes('doctype html') ||
+                customAlert.technicalDetails?.includes('HTML block') ||
+                customAlert.technicalDetails?.includes('index.html')) && (
+                <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/20 space-y-2 text-[11px] leading-relaxed text-amber-200">
+                  <p className="font-semibold text-amber-300">💡 Diagnostic Advisory for Static Hosting (Firebase):</p>
+                  <p>
+                    Firebase Hosting is a fully client-side static service and has access only to static build files (HTML/CSS/JS). 
+                    Without a live database proxy rewrite or separate cloud functions deployment, requests to backend server APIs (<code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">/api/*</code>) will rewrite directly to your compiled <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">index.html</code> file.
+                  </p>
+                  <p className="font-semibold text-amber-300">How to solve this:</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>Recommended: Access the application through your Google AI Studio <strong className="text-amber-300">Cloud Run Dev/Preview link</strong>, which runs the Node/TS backend server inside containerized sandboxes!</li>
+                    <li>Or, connect/migrate Express routes to Firebase Functions rewrite.</li>
+                  </ul>
+                </div>
+              )}
+
+              {/* Technical Details / Expandable console-like block */}
+              {customAlert.technicalDetails && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-text-muted">
+                    <span className="font-mono text-[10px] tracking-wider uppercase">Full Server Response Log ({customAlert.technicalDetails.length} chars)</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(customAlert.technicalDetails || '');
+                        alert('Full technical diagnostic log details copied to clipboard!');
+                      }}
+                      className="px-2 py-1 bg-black hover:bg-black/75 rounded border border-brand-gold/15 transition flex items-center gap-1 cursor-pointer text-brand-gold font-bold font-mono text-[9px]"
+                    >
+                      <Copy className="w-2.5 h-2.5" /> COPY RAW LOG
+                    </button>
+                  </div>
+                  <div className="w-full h-48 overflow-auto rounded-xl bg-black border border-brand-gold/10 p-4 font-mono text-[10px] leading-relaxed text-red-300/90 whitespace-pre scrollbar-thin">
+                    {customAlert.technicalDetails}
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="px-6 py-4 bg-stone-900/60 border-t border-brand-gold/10 flex items-center justify-end gap-3 shrink-0">
+              <button
+                onClick={() => setCustomAlert(null)}
+                className="px-5 py-2 hover:bg-white/5 text-text-muted hover:text-text-main text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Acknowledge
+              </button>
+              {customAlert.technicalDetails && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`Title: ${customAlert.title}\nMessage: ${customAlert.message}\nDetails: ${customAlert.technicalDetails}`);
+                    alert('Full Diagnostic context successfully saved to clipboard!');
+                  }}
+                  className="px-5 py-2 bg-brand-gold/15 hover:bg-brand-gold/25 border border-brand-gold/30 hover:border-brand-gold/50 text-brand-gold text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" /> Copy Log
+                </button>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

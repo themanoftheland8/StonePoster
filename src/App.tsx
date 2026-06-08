@@ -1446,37 +1446,9 @@ export default function App() {
               {/* ── ACTION HUB: Poll banner + Upload + History ── always shown below */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-                {/* Left: Poll banner + Upload */}
-                <div className="lg:col-span-7 space-y-6">
-
-                  {/* Visual workflow banner */}
-                  <div className="glass-premium rounded-3xl p-6 text-white overflow-hidden relative shadow-lg">
-                    <div className="absolute right-0 top-0 translate-x-12 -translate-y-6 opacity-5 blur-xl w-72 h-72 rounded-full bg-brand-gold" />
-                    <div className="relative space-y-3 max-w-lg">
-                      <span className="text-[10px] uppercase font-bold tracking-widest text-brand-gold font-mono flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-brand-gold" /> Auto-Scheduler Node
-                      </span>
-                      <h2 className="font-display font-medium text-2xl tracking-tight leading-none text-text-main sm:text-3xl">
-                        Trigger Immediate Polling
-                      </h2>
-                      <p className="text-xs text-text-muted leading-relaxed">
-                        Scan your Google Drive folder, pick a random unposted photo or video, and generate 3 Gemini-powered caption ideas.
-                      </p>
-                      <div className="pt-2">
-                        <button
-                          onClick={handlePollAndPickRandom}
-                          disabled={isPolling || isProcessing}
-                          className="px-5 py-3 btn-gold font-bold text-xs rounded-xl disabled:opacity-50 transition flex items-center gap-1.5 uppercase shadow-sm cursor-pointer"
-                        >
-                          {isPolling ? 'Scanning Drive...' : 'Poll & Pick Random File'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Manual upload */}
+                {/* Left: Upload */}
+                <div className="lg:col-span-7">
                   <ManualUploadCard onUpload={handleManualUploadFlow} isProcessing={isProcessing} />
-
                 </div>
 
                 {/* Right: History */}
@@ -1499,7 +1471,7 @@ export default function App() {
                         {posts.map((post) => (
                           <div
                             key={post.id}
-                            className={`flex items-center gap-3 p-3 border rounded-xl transition cursor-pointer ${
+                            className={`flex items-start gap-3 p-3 border rounded-xl transition cursor-pointer ${
                               activePost?.id === post.id
                                 ? 'bg-brand-gold/10 border-brand-gold/40'
                                 : 'bg-black/25 hover:bg-black/40 border-brand-gold/5 hover:border-brand-gold/15'
@@ -1510,13 +1482,13 @@ export default function App() {
                               src={post.imageUrl}
                               alt={post.fileName}
                               referrerPolicy="no-referrer"
-                              className="w-11 h-11 rounded-lg object-cover bg-stone-900 shrink-0 border border-brand-gold/10"
+                              className="w-11 h-11 rounded-lg object-cover bg-stone-900 shrink-0 border border-brand-gold/10 mt-0.5"
                             />
                             <div className="flex-1 min-w-0">
                               <h4 className="text-xs font-semibold text-text-main truncate">{post.fileName}</h4>
-                              <p className="text-[10px] text-text-muted truncate mt-0.5">{post.selectedCaption || 'No caption...'}</p>
+                              <p className="text-[10px] text-text-muted mt-1 leading-normal whitespace-pre-wrap">{post.selectedCaption || 'No caption...'}</p>
                             </div>
-                            <div className="shrink-0">
+                            <div className="shrink-0 mt-0.5">
                               {post.status === 'posted' ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-500/30">
                                   <CheckCircle className="w-3 h-3" /> Posted

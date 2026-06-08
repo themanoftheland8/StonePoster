@@ -664,6 +664,25 @@ export default function App() {
   // Run auto-poll if countdown reaches 0 to mock automated background routine
   const triggerAutoPoll = async () => {
     if (!user || !gdriveToken || isPolling || isProcessing || !config?.isPollingActive) return;
+
+    // Skip polling if there is already a post waiting in the review queue.
+    // Advance the schedule silently so the timer doesn't fire again immediately.
+    const hasPendingPost = posts.some(p => p.status === 'pending_review');
+    if (hasPendingPost) {
+      const nextTime = getNextScheduledTime(config.minIntervalHours, config.maxIntervalHours);
+      const updatedConfig = { ...config, nextPostTime: nextTime };
+      await setDoc(doc(db, `users/${user.uid}`), updatedConfig);
+      setConfig(updatedConfig);
+      await createSystemLog(user.uid, 'info', `Auto-poll skipped — a post is already pending review. Rescheduled for: ${new Date(nextTime).toLocaleTimeString()}`);
+      return;
+    }
+
+    // Advance the schedule immediately so the 1-second tick loop can't re-fire this.
+    const nextTime = getNextScheduledTime(config.minIntervalHours, config.maxIntervalHours);
+    const updatedConfig = { ...config, nextPostTime: nextTime };
+    await setDoc(doc(db, `users/${user.uid}`), updatedConfig);
+    setConfig(updatedConfig);
+
     await createSystemLog(user.uid, 'info', 'Preset random interval has concluded. Triggering automated content pull...');
     await handlePollAndPickRandom();
   };

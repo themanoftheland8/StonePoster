@@ -187,8 +187,32 @@ export default function App() {
       setLoading(true);
       if (parsedUser) {
         setUser(parsedUser);
+        
+        // Try resolving Drive token locally first
+        const localToken = localStorage.getItem(`gdrive_token_${parsedUser.uid}`);
+        if (localToken) {
+          setGdriveToken(localToken);
+        }
+
         // Load data for the authenticated session
         await handleSessionLoad(parsedUser);
+
+        // Fetch user document from Firestore to sync Drive token & refresh token if present
+        try {
+          const uDoc = await getDoc(doc(db, `users/${parsedUser.uid}`));
+          if (uDoc.exists()) {
+            const data = uDoc.data();
+            if (data.driveToken) {
+              setGdriveToken(data.driveToken);
+              localStorage.setItem(`gdrive_token_${parsedUser.uid}`, data.driveToken);
+            }
+            if (data.driveRefreshToken) {
+              localStorage.setItem(`gdrive_refresh_token_${parsedUser.uid}`, data.driveRefreshToken);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to sync Drive credentials from Firestore:", err);
+        }
       } else {
         setUser(null);
         setGdriveToken(null);
@@ -246,9 +270,34 @@ export default function App() {
       setLoading(true);
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
+      
       if (credential?.accessToken) {
         setGdriveToken(credential.accessToken);
-        await createSystemLog(result.user.uid, 'success', 'Google user logged in & Drive scope token authorized');
+        
+        // Save the Google Drive OAuth credentials securely in Firestore.
+        // We capture the OAuth credentials (access token and optionally refresh token)
+        // and store them under the user's document for persistence.
+        const tokenData: any = {
+          driveToken: credential.accessToken,
+          driveTokenExpiresAt: Date.now() + 3500 * 1000, // Google tokens typically expire in 1 hour
+          updatedAt: Date.now(),
+        };
+
+        // If a refresh token is returned by the Google Provider, store it as well
+        const rawCred = (credential as any)._tokenResponse;
+        if (rawCred && rawCred.refreshToken) {
+          tokenData.driveRefreshToken = rawCred.refreshToken;
+        }
+
+        await setDoc(doc(db, `users/${result.user.uid}`), tokenData, { merge: true });
+        
+        // Save locally to localStorage so it survives immediate session reloads
+        localStorage.setItem(`gdrive_token_${result.user.uid}`, credential.accessToken);
+        if (rawCred && rawCred.refreshToken) {
+          localStorage.setItem(`gdrive_refresh_token_${result.user.uid}`, rawCred.refreshToken);
+        }
+
+        await createSystemLog(result.user.uid, 'success', 'Google user logged in & Drive scope token authorized and saved');
       }
     } catch (err) {
       console.error('Sign-in failure:', err);
@@ -260,6 +309,10 @@ export default function App() {
   // Terminate Auth Session
   const handleLogout = async () => {
     try {
+      if (user) {
+        localStorage.removeItem(`gdrive_token_${user.uid}`);
+        localStorage.removeItem(`gdrive_refresh_token_${user.uid}`);
+      }
       await auth.signOut();
     } catch (err) {
       console.error(err);
@@ -510,6 +563,68 @@ export default function App() {
     }
   };
 
+  // Refresh Drive Access Token silently if expired using stored refresh token
+  const getFreshDriveToken = async (): Promise<string | null> => {
+    if (!user) return null;
+    
+    // Check if token exists in state
+    if (gdriveToken) {
+      // Check expiration if we saved it in Firestore
+      try {
+        const uDoc = await getDoc(doc(db, `users/${user.uid}`));
+        if (uDoc.exists()) {
+          const data = uDoc.data();
+          // If token expires in less than 5 minutes, trigger silent refresh
+          if (data.driveTokenExpiresAt && Date.now() < data.driveTokenExpiresAt - 300 * 1000) {
+            return data.driveToken;
+          }
+        }
+      } catch (e) {
+        console.warn("Could not check token expiration from Firestore:", e);
+      }
+    }
+
+    const refreshToken = localStorage.getItem(`gdrive_refresh_token_${user.uid}`);
+    if (!refreshToken) {
+      return gdriveToken;
+    }
+
+    try {
+      const refreshRes = await fetch(getApiUrl('/api/auth/refresh-drive-token'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (refreshRes.ok) {
+        const payload = await refreshRes.json();
+        const newAccessToken = payload.accessToken;
+        
+        if (newAccessToken) {
+          setGdriveToken(newAccessToken);
+          localStorage.setItem(`gdrive_token_${user.uid}`, newAccessToken);
+          
+          await setDoc(
+            doc(db, `users/${user.uid}`),
+            {
+              driveToken: newAccessToken,
+              driveTokenExpiresAt: Date.now() + (payload.expiresIn || 3600) * 1000,
+              updatedAt: Date.now(),
+            },
+            { merge: true }
+          );
+
+          await createSystemLog(user.uid, 'info', 'Silently refreshed Google Drive session access token');
+          return newAccessToken;
+        }
+      }
+    } catch (err) {
+      console.error("Silent token refresh request failed:", err);
+    }
+
+    return gdriveToken;
+  };
+
   // Run auto-poll if countdown reaches 0 to mock automated background routine
   const triggerAutoPoll = async () => {
     if (!user || isPolling || isProcessing || !config?.isPollingActive) return;
@@ -520,7 +635,10 @@ export default function App() {
   // Manual Trigger: Scan configured Drive Location, randomly select file, draw captions
   const handlePollAndPickRandom = async () => {
     if (!user) return;
-    if (!gdriveToken) {
+    
+    // Always fetch/refresh token before execution
+    const activeToken = await getFreshDriveToken();
+    if (!activeToken) {
       await createSystemLog(user.uid, 'error', 'Google authentication token expired. Please re-authenticate.');
       triggerAlert('warning', 'Session Refresh Required', 'Please click Sign-in again to refresh your secure Google session and update your Drive authentication token.');
       return;
@@ -533,7 +651,7 @@ export default function App() {
       // 1. Fetch file list under configured parent directory (include file size to prevent downloading huge files)
       const listUrl = `https://www.googleapis.com/drive/v3/files?q='${config?.driveFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size)&pageSize=100`;
       const response = await fetch(listUrl, {
-        headers: { Authorization: `Bearer ${gdriveToken}` },
+        headers: { Authorization: `Bearer ${activeToken}` },
       });
 
       if (!response.ok) {
@@ -584,7 +702,7 @@ export default function App() {
         body: JSON.stringify({
           fileId: selectedFile.id,
           mimeType: selectedFile.mimeType,
-          gdriveToken,
+          gdriveToken: activeToken,
         }),
       });
 
@@ -671,7 +789,9 @@ export default function App() {
   // Manual Local File Selection: Mirror the full Google Drive upload workflow!
   const handleManualUploadFlow = async (file: File) => {
     if (!user) return;
-    if (!gdriveToken) {
+    
+    const activeToken = await getFreshDriveToken();
+    if (!activeToken) {
       triggerAlert('warning', 'Google Authentication Expected', 'Please connect Google Drive by signing in first.');
       return;
     }
@@ -704,7 +824,7 @@ export default function App() {
           mimeType: file.type,
           base64Data,
           parentFolderId: config?.driveFolderId,
-          gdriveToken,
+          gdriveToken: activeToken,
         }),
       });
 
@@ -724,7 +844,7 @@ export default function App() {
         body: JSON.stringify({
           fileId: driveFileId,
           mimeType: file.type,
-          gdriveToken,
+          gdriveToken: activeToken,
         }),
       });
 
@@ -879,20 +999,24 @@ export default function App() {
       await createSystemLog(user.uid, 'success', logMsg);
 
       // Now move file inside Drive under "posted" folder
-      if (activePost.driveFileId && gdriveToken) {
-        await createSystemLog(user.uid, 'info', `Moving Google Drive file ${activePost.driveFileId} to 'posted' subfolder...`);
-        const moveRes = await fetch(getApiUrl('/api/drive/move-file'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileId: activePost.driveFileId,
-            parentFolderId: config?.driveFolderId,
-            destinationFolderName: 'posted',
-            gdriveToken,
-          }),
-        });
-        if (moveRes.ok) {
-          await createSystemLog(user.uid, 'info', 'Google Drive file archiving completed successfully.');
+      // Now move file inside Drive under "posted" folder
+      if (activePost.driveFileId) {
+        const activeToken = await getFreshDriveToken();
+        if (activeToken) {
+          await createSystemLog(user.uid, 'info', `Moving Google Drive file ${activePost.driveFileId} to 'posted' subfolder...`);
+          const moveRes = await fetch(getApiUrl('/api/drive/move-file'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileId: activePost.driveFileId,
+              parentFolderId: config?.driveFolderId,
+              destinationFolderName: 'posted',
+              gdriveToken: activeToken,
+            }),
+          });
+          if (moveRes.ok) {
+            await createSystemLog(user.uid, 'info', 'Google Drive file archiving completed successfully.');
+          }
         }
       }
 
@@ -938,18 +1062,21 @@ export default function App() {
     await createSystemLog(user.uid, 'info', `Skipping draft: '${activePost.fileName}'`);
 
     try {
-      if (activePost.driveFileId && gdriveToken) {
-        await createSystemLog(user.uid, 'info', `Archiving Google Drive file to 'skipped' subfolder...`);
-        await fetch(getApiUrl('/api/drive/move-file'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileId: activePost.driveFileId,
-            parentFolderId: config?.driveFolderId,
-            destinationFolderName: 'skipped',
-            gdriveToken,
-          }),
-        });
+      if (activePost.driveFileId) {
+        const activeToken = await getFreshDriveToken();
+        if (activeToken) {
+          await createSystemLog(user.uid, 'info', `Archiving Google Drive file to 'skipped' subfolder...`);
+          await fetch(getApiUrl('/api/drive/move-file'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileId: activePost.driveFileId,
+              parentFolderId: config?.driveFolderId,
+              destinationFolderName: 'skipped',
+              gdriveToken: activeToken,
+            }),
+          });
+        }
       }
 
       const updatedNode: PostItem = {

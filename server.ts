@@ -55,6 +55,46 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// OAuth Drive Access Token Refresh Endpoint
+app.post(['/api/auth/refresh-drive-token', '/api/auth/refresh-drive-token/'], async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'Missing refreshToken' });
+  }
+
+  try {
+    // Read the Client ID and Client Secret dynamically if configured, or use fallback if Google App is default.
+    // Google Auth provider credentials exchange
+    const tokenUrl = 'https://oauth2.googleapis.com/token';
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID || '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    });
+
+    const refreshRes = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    if (!refreshRes.ok) {
+      const errText = await refreshRes.text();
+      throw new Error(`Google refresh request rejected: ${errText}`);
+    }
+
+    const payload: any = await refreshRes.json();
+    res.json({
+      accessToken: payload.access_token,
+      expiresIn: payload.expires_in,
+    });
+  } catch (err: any) {
+    console.error('Failed refreshing Google Drive token:', err);
+    res.status(500).json({ error: err.message || 'Token refresh error' });
+  }
+});
+
 // Helper: Parse Gemini JSON Array cleanly
 function cleanAndParseJSON(text: string): string[] {
   try {

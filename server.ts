@@ -6,11 +6,10 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { TwitterApi } from 'twitter-api-v2';
 import dotenv from 'dotenv';
-
+import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 
 dotenv.config();
-
 
 // Lazy initialization helper for Gemini
 let aiInstance: GoogleGenAI | null = null;
@@ -35,8 +34,29 @@ function getGeminiClient(): GoogleGenAI {
 const app = express();
 const PORT = 3000;
 
+// DDoS & Rate Limiting Protection Setup
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes' }
+});
+
+// Stricter rate limiter for compute-heavy AI/Publish APIs to mitigate API Abuse
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30, // Limit each IP to 30 sensitive endpoint requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Sensitive API rate limit reached. Please wait 15 minutes before retrying.' }
+});
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// Apply general rate limiting to all requests
+app.use(generalLimiter);
 
 // Request Logging Middleware for auditing incoming requests
 app.use((req, res, next) => {
@@ -125,7 +145,7 @@ function cleanAndParseJSON(text: string): string[] {
 }
 
 // 1. POST Endpoint to fetch and caption photo/video from Google Drive
-app.post(['/api/posts/analyze-gdrive', '/api/posts/analyze-gdrive/'], async (req, res) => {
+app.post(['/api/posts/analyze-gdrive', '/api/posts/analyze-gdrive/'], apiLimiter, async (req, res) => {
   const { fileId, mimeType, gdriveToken } = req.body;
 
   if (!fileId || !gdriveToken) {
@@ -220,7 +240,7 @@ app.post(['/api/posts/analyze-gdrive', '/api/posts/analyze-gdrive/'], async (req
 });
 
 // 2. POST Endpoint to analyze manual upload
-app.post(['/api/posts/analyze-upload', '/api/posts/analyze-upload/'], async (req, res) => {
+app.post(['/api/posts/analyze-upload', '/api/posts/analyze-upload/'], apiLimiter, async (req, res) => {
   const { fileName, mimeType, base64Data } = req.body;
 
   if (!base64Data) {
@@ -264,7 +284,7 @@ app.post(['/api/posts/analyze-upload', '/api/posts/analyze-upload/'], async (req
 });
 
 // 3. POST Endpoint to publish to Bluesky and X
-app.post(['/api/posts/publish', '/api/posts/publish/'], async (req, res) => {
+app.post(['/api/posts/publish', '/api/posts/publish/'], apiLimiter, async (req, res) => {
   const {
     caption,
     imageUrl, // fully qualified data:image/jpeg;base64,...
@@ -419,7 +439,7 @@ app.post(['/api/posts/publish', '/api/posts/publish/'], async (req, res) => {
 });
 
 // 4. POST Endpoint to upload files manually directly onto user's Google Drive folder
-app.post(['/api/drive/upload', '/api/drive/upload/'], async (req, res) => {
+app.post(['/api/drive/upload', '/api/drive/upload/'], apiLimiter, async (req, res) => {
   const { fileName, mimeType, base64Data, parentFolderId, gdriveToken } = req.body;
 
   if (!base64Data || !gdriveToken || !parentFolderId) {
@@ -479,7 +499,7 @@ app.post(['/api/drive/upload', '/api/drive/upload/'], async (req, res) => {
 });
 
 // 5. POST Endpoint to move file inside Google Drive
-app.post(['/api/drive/move-file', '/api/drive/move-file/'], async (req, res) => {
+app.post(['/api/drive/move-file', '/api/drive/move-file/'], apiLimiter, async (req, res) => {
   const { fileId, parentFolderId, destinationFolderName, gdriveToken } = req.body;
 
   if (!fileId || !parentFolderId || !destinationFolderName || !gdriveToken) {

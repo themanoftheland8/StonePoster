@@ -16,6 +16,7 @@ import {
   setDoc,
   collection,
   getDocs,
+  onSnapshot,
   addDoc,
   query,
   orderBy,
@@ -27,6 +28,13 @@ import ConfigManager from './components/ConfigManager';
 import ImageCropper from './components/ImageCropper';
 import ManualUploadCard from './components/ManualUploadCard';
 import { versionInfo } from './version';
+import {
+  isWebPushSupported,
+  getCurrentPushSubscription,
+  subscribeToWebPush,
+  unsubscribeFromWebPush,
+  sendTestWebPush,
+} from './lib/webPush';
 
 import {
   Compass,
@@ -54,6 +62,7 @@ import {
   Check,
   X,
   Zap,
+  Bell,
 } from 'lucide-react';
 
 export default function App() {
@@ -90,6 +99,15 @@ export default function App() {
 
   // Counter
   const [countdownStr, setCountdownStr] = useState<string>('Not Scheduled');
+
+  // 24/7 Service Account & Chrome Web Push states
+  const [serviceAccountEmail, setServiceAccountEmail] = useState<string | null>(null);
+  const [isThisDeviceSubscribed, setIsThisDeviceSubscribed] = useState(false);
+  const [subscribedDeviceCount, setSubscribedDeviceCount] = useState(0);
+  const [isPushBusy, setIsPushBusy] = useState(false);
+  const autoPollLockRef = React.useRef(false);
+  const triggerAutoPollRef = React.useRef<() => void>(() => {});
+  const dismissedPostIdRef = React.useRef<string | null>(null);
 
   // Custom Alert / Detailed Notification modal state
   const [customAlert, setCustomAlert] = useState<{
@@ -184,7 +202,7 @@ export default function App() {
     return pathPart;
   };
 
-  // Check backend health to verify if we are running in a static-only hosting environment
+  // Check backend health and load service account email for 24/7 Drive sharing
   useEffect(() => {
     const checkBackendHealth = async () => {
       try {
@@ -198,6 +216,15 @@ export default function App() {
           } else {
             // Backend connected successfully! No warning needed.
             setHostingDiagnosticWarning(null);
+            try {
+              const saRes = await fetch(getApiUrl('/api/drive/service-account'));
+              if (saRes.ok) {
+                const saData = await saRes.json();
+                setServiceAccountEmail(saData.email || null);
+              }
+            } catch {
+              // Non-fatal
+            }
           }
         } else {
           setHostingDiagnosticWarning(
@@ -212,6 +239,14 @@ export default function App() {
     };
     checkBackendHealth();
   }, [config?.backendUrl]);
+
+  // Check if this browser/device already has an active Chrome Web Push subscription
+  useEffect(() => {
+    if (!isWebPushSupported()) return;
+    getCurrentPushSubscription()
+      .then((sub) => setIsThisDeviceSubscribed(Boolean(sub)))
+      .catch(() => setIsThisDeviceSubscribed(false));
+  }, []);
 
   // Configure Google OAuth provider with scopes
   const provider = new GoogleAuthProvider();
@@ -256,10 +291,58 @@ export default function App() {
         setPosts([]);
         setLogs([]);
         setActivePost(null);
+        setSubscribedDeviceCount(0);
       }
       setLoading(false);
     });
   }, []);
+
+  // Live Firestore subscriptions so background Cloud Scheduler updates appear immediately
+  useEffect(() => {
+    if (!user) return;
+    const uid = user.uid;
+
+    const unsubConfig = onSnapshot(doc(db, `users/${uid}`), (snap) => {
+      if (snap.exists()) {
+        setConfig(snap.data() as UserConfig);
+      }
+    });
+
+    const unsubPosts = onSnapshot(collection(db, `users/${uid}/posts`), (snap) => {
+      const postsList: PostItem[] = [];
+      snap.forEach((d) => postsList.push(d.data() as PostItem));
+      const sortedPosts = postsList.sort((a, b) => b.createdAt - a.createdAt);
+      setPosts(sortedPosts);
+
+      const pendingDraft = sortedPosts.find((p) => p.status === 'pending_review');
+      if (pendingDraft) {
+        setActivePost((prev) => {
+          if (prev && prev.id === pendingDraft.id) return pendingDraft;
+          if (dismissedPostIdRef.current === pendingDraft.id) return prev;
+          return pendingDraft;
+        });
+      } else {
+        setActivePost((prev) => (prev && prev.status === 'pending_review' ? null : prev));
+      }
+    });
+
+    const unsubLogs = onSnapshot(collection(db, `users/${uid}/logs`), (snap) => {
+      const logsList: LogItem[] = [];
+      snap.forEach((d) => logsList.push(d.data() as LogItem));
+      setLogs(logsList.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50));
+    });
+
+    const unsubPush = onSnapshot(collection(db, `users/${uid}/pushSubscriptions`), (snap) => {
+      setSubscribedDeviceCount(snap.size);
+    });
+
+    return () => {
+      unsubConfig();
+      unsubPosts();
+      unsubLogs();
+      unsubPush();
+    };
+  }, [user?.uid]);
 
   // Mobile Responsiveness Helper: Auto-scroll to phone simulator preview when a draft is active
   useEffect(() => {
@@ -285,8 +368,7 @@ export default function App() {
 
       if (diff <= 0) {
         setCountdownStr('Auto-poll due now!');
-        // Automatically poll if active and we want to emulate background execution
-        triggerAutoPoll();
+        triggerAutoPollRef.current();
       } else {
         const h = Math.floor(diff / (1000 * 60 * 60));
         const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -298,7 +380,7 @@ export default function App() {
     handleInterval();
     const clock = setInterval(handleInterval, 1000);
     return () => clearInterval(clock);
-  }, [config]);
+  }, [config?.nextPostTime, config?.isPollingActive]);
 
   // Authenticate & Connect Drive Scope
   const handleLogin = async () => {
@@ -401,6 +483,7 @@ export default function App() {
           blueskyEnabled: false,
           twitterEnabled: false,
           webhookEnabled: false,
+          pushNotificationsEnabled: true,
           backendUrl: '',
         };
         await setDoc(doc(db, draftPath), currentConfig);
@@ -452,7 +535,7 @@ export default function App() {
         nextPostTime: config?.nextPostTime || getNextScheduledTime(newConfig.minIntervalHours, newConfig.maxIntervalHours),
         updatedAt: Date.now(),
       };
-      await setDoc(doc(db, path), updatedConfig);
+      await setDoc(doc(db, path), updatedConfig, { merge: true });
       setConfig(updatedConfig);
       await createSystemLog(user.uid, 'success', 'Successfully updated server configurations & API integrations');
       setActiveTab('dashboard');
@@ -661,157 +744,131 @@ export default function App() {
     return gdriveToken;
   };
 
-  // Run auto-poll if countdown reaches 0 to mock automated background routine
-  const triggerAutoPoll = async () => {
-    if (!user || !gdriveToken || isPolling || isProcessing || !config?.isPollingActive) return;
-
-    // Skip polling if there is already a post waiting in the review queue.
-    // Advance the schedule silently so the timer doesn't fire again immediately.
-    const hasPendingPost = posts.some(p => p.status === 'pending_review');
-    if (hasPendingPost) {
-      const nextTime = getNextScheduledTime(config.minIntervalHours, config.maxIntervalHours);
-      const updatedConfig = { ...config, nextPostTime: nextTime };
-      await setDoc(doc(db, `users/${user.uid}`), updatedConfig);
-      setConfig(updatedConfig);
-      await createSystemLog(user.uid, 'info', `Auto-poll skipped — a post is already pending review. Rescheduled for: ${new Date(nextTime).toLocaleTimeString()}`);
-      return;
+  // Chrome Web Push subscription handlers
+  const handleEnablePush = async () => {
+    if (!user) return;
+    setIsPushBusy(true);
+    try {
+      const idToken = await user.getIdToken();
+      const { deviceLabel } = await subscribeToWebPush(getApiUrl, idToken);
+      setIsThisDeviceSubscribed(true);
+      await createSystemLog(user.uid, 'success', `Enabled Chrome push notifications on ${deviceLabel}`);
+      triggerBanner(`Chrome notifications enabled on ${deviceLabel}! You'll be alerted even when the browser is closed.`);
+    } catch (err: any) {
+      console.error('Failed enabling Chrome push:', err);
+      triggerAlert('warning', 'Chrome Notifications Setup', err?.message || String(err));
+    } finally {
+      setIsPushBusy(false);
     }
-
-    // Advance the schedule immediately so the 1-second tick loop can't re-fire this.
-    const nextTime = getNextScheduledTime(config.minIntervalHours, config.maxIntervalHours);
-    const updatedConfig = { ...config, nextPostTime: nextTime };
-    await setDoc(doc(db, `users/${user.uid}`), updatedConfig);
-    setConfig(updatedConfig);
-
-    await createSystemLog(user.uid, 'info', 'Preset random interval has concluded. Triggering automated content pull...');
-    await handlePollAndPickRandom();
   };
 
-  // Manual Trigger: Scan configured Drive Location, randomly select file, draw captions
-  const handlePollAndPickRandom = async () => {
+  const handleDisablePush = async () => {
     if (!user) return;
-    
-    // Always fetch/refresh token before execution
-    const activeToken = await getFreshDriveToken();
-    if (!activeToken) {
-      await createSystemLog(user.uid, 'error', 'Google authentication token expired. Please re-authenticate.');
-      triggerAlert('warning', 'Session Refresh Required', 'Please click Sign-in again to refresh your secure Google session and update your Drive authentication token.');
-      return;
+    setIsPushBusy(true);
+    try {
+      const idToken = await user.getIdToken();
+      await unsubscribeFromWebPush(getApiUrl, idToken);
+      setIsThisDeviceSubscribed(false);
+      await createSystemLog(user.uid, 'info', 'Disabled Chrome push notifications on this device');
+      triggerBanner('Chrome push notifications disabled on this device.');
+    } catch (err: any) {
+      console.error('Failed disabling Chrome push:', err);
+      triggerAlert('error', 'Failed Disabling Notifications', err?.message || String(err));
+    } finally {
+      setIsPushBusy(false);
     }
+  };
 
-    setIsPolling(true);
-    await createSystemLog(user.uid, 'info', `Scanning Google Drive Location for assets: [${config?.driveFolderId}]`);
+  const handleTestPush = async () => {
+    if (!user) return;
+    setIsPushBusy(true);
+    try {
+      const idToken = await user.getIdToken();
+      const res = await sendTestWebPush(getApiUrl, idToken);
+      triggerBanner(`Test Chrome notification sent to ${res.sent} device(s)!`);
+    } catch (err: any) {
+      console.error('Failed sending test push:', err);
+      triggerAlert('warning', 'Test Notification Failed', err?.message || String(err));
+    } finally {
+      setIsPushBusy(false);
+    }
+  };
+
+  // Run auto-poll if countdown reaches 0 while tab is open (Cloud Scheduler also runs every 5m 24/7)
+  const triggerAutoPoll = async () => {
+    if (!user || isPolling || isProcessing || !config?.isPollingActive || autoPollLockRef.current) return;
+    autoPollLockRef.current = true;
 
     try {
-      // 1. Fetch file list under configured parent directory (include file size to prevent downloading huge files)
-      const listUrl = `https://www.googleapis.com/drive/v3/files?q='${config?.driveFolderId}'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size)&pageSize=100`;
-      const response = await fetch(listUrl, {
-        headers: { Authorization: `Bearer ${activeToken}` },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Google Drive returned error status: ${response.statusText}`);
-      }
-
-      const rawResult = await response.json();
-      const items = rawResult.files || [];
-
-      // Filter only image and short video kinds, and check size to avoid downloading files that are too large (e.g. max 15MB)
-      const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15MB
-      const mediaItems = items.filter((f: any) => {
-        const isSupportedType = f.mimeType.startsWith('image/') || f.mimeType.startsWith('video/');
-        const isSizeAcceptable = !f.size || parseInt(f.size) <= MAX_FILE_SIZE_BYTES;
-        return isSupportedType && isSizeAcceptable;
-      });
-
-      if (mediaItems.length === 0) {
-        await createSystemLog(user.uid, 'info', 'No supportable image/video assets discovered in target folder');
-        triggerAlert('info', 'No Compatible Assets Found', `We successfully scanned Drive Folder [${config?.driveFolderId}] but did not discover any image or short video files matching our 15MB size limit. Please verify the folder contains compatible files under 15MB.`);
-        setIsPolling(false);
+      // Skip polling if there is already a post waiting in the review queue.
+      // Advance the schedule silently so the timer doesn't fire again immediately.
+      const hasPendingPost = posts.some(p => p.status === 'pending_review');
+      if (hasPendingPost) {
+        const nextTime = getNextScheduledTime(config.minIntervalHours, config.maxIntervalHours);
+        const updatedConfig = { ...config, nextPostTime: nextTime };
+        await setDoc(doc(db, `users/${user.uid}`), updatedConfig, { merge: true });
+        setConfig(updatedConfig);
+        await createSystemLog(user.uid, 'info', `Auto-poll skipped — a post is already pending review. Rescheduled for: ${new Date(nextTime).toLocaleTimeString()}`);
         return;
       }
 
-      // Check which IDs we have already processed in our historical list
-      const processedIds = new Set(posts.map(p => p.driveFileId));
-      const unprocessedMedia = mediaItems.filter((m: any) => !processedIds.has(m.id));
+      // Advance the schedule immediately so the 1-second tick loop can't re-fire this.
+      const nextTime = getNextScheduledTime(config.minIntervalHours, config.maxIntervalHours);
+      const updatedConfig = { ...config, nextPostTime: nextTime };
+      await setDoc(doc(db, `users/${user.uid}`), updatedConfig, { merge: true });
+      setConfig(updatedConfig);
 
-      let selectedFile = null;
-      if (unprocessedMedia.length > 0) {
-        // Pick one at random from unprocessed files
-        const randomIdx = Math.floor(Math.random() * unprocessedMedia.length);
-        selectedFile = unprocessedMedia[randomIdx];
-      } else {
-        await createSystemLog(user.uid, 'info', 'All files in folder have been previously posted or skipped. Cycling random file selection...');
-        const randomIdx = Math.floor(Math.random() * mediaItems.length);
-        selectedFile = mediaItems[randomIdx];
-      }
+      await createSystemLog(user.uid, 'info', 'Preset random interval has concluded. Triggering automated content pull...');
+      await handlePollAndPickRandom();
+    } finally {
+      autoPollLockRef.current = false;
+    }
+  };
 
-      await createSystemLog(user.uid, 'info', `Selected asset: '${selectedFile.name}' (${selectedFile.id}). Triggering Gemini visual captioning...`);
-      setIsPolling(false);
-      setIsProcessing(true);
+  triggerAutoPollRef.current = triggerAutoPoll;
 
-      // 2. Send selected GDrive fileId to server for downloading & Gemini vision captions modeling
-      const analyzeRes = await fetch(getApiUrl('/api/posts/analyze-gdrive'), {
+  // Manual or Scheduled Trigger: Run server-side Drive scan -> Gemini captions -> Firestore -> Chrome Push
+  const handlePollAndPickRandom = async () => {
+    if (!user) return;
+
+    const activeToken = await getFreshDriveToken();
+    setIsPolling(true);
+
+    try {
+      const idToken = await user.getIdToken();
+      const pollRes = await fetch(getApiUrl('/api/posts/poll-now'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
-          fileId: selectedFile.id,
-          mimeType: selectedFile.mimeType,
-          gdriveToken: activeToken,
+          gdriveToken: activeToken || undefined,
         }),
       });
 
-      if (!analyzeRes.ok) {
-        const errPayload = await safeFetchJson(analyzeRes, 'Server captioning pipeline failed').catch(e => ({ error: e.message }));
-        throw new Error(errPayload.error || 'Server captioning pipeline failed');
+      if (!pollRes.ok) {
+        const errPayload = await safeFetchJson(pollRes, 'Server polling pipeline failed').catch(e => ({ error: e.message }));
+        throw new Error(errPayload.error || 'Server polling pipeline failed');
       }
 
-      const analyzedOutput = await safeFetchJson(analyzeRes, 'Failed to extract captions content');
-      const generatedCaptions = analyzedOutput.captions;
-      let fileUrlData = analyzedOutput.imageUrl;
-
-      // Downscale image if too large (e.g. from high resolution Drive sync) before saving to Firestore
-      if (fileUrlData.startsWith('data:image/')) {
-        fileUrlData = await downscaleBase64Image(fileUrlData);
+      const pollData = await safeFetchJson(pollRes, 'Failed parsing poll response');
+      if (pollData.skipped && pollData.reason === 'no_media') {
+        triggerAlert(
+          'info',
+          'No Compatible Assets Found',
+          `We scanned Drive Folder [${config?.driveFolderId}] but did not discover any image or short video files under 15MB.`
+        );
+      } else if (pollData.skipped && pollData.reason === 'pending_review') {
+        triggerBanner('A draft is already waiting for your review.');
+      } else if (pollData.createdPostId) {
+        dismissedPostIdRef.current = null;
+        await handleSessionLoad(user);
       }
-
-      // 3. Register proposed post drafted in Firestore
-      const newPostId = `post_${Date.now()}`;
-      const newPostNode: PostItem = {
-        id: newPostId,
-        driveFileId: selectedFile.id,
-        fileName: selectedFile.name,
-        mimeType: selectedFile.mimeType,
-        imageUrl: fileUrlData,
-        captions: generatedCaptions,
-        selectedCaption: generatedCaptions[0] || '',
-        status: 'pending_review',
-        createdAt: Date.now(),
-      };
-
-      await setDoc(doc(db, `users/${user.uid}/posts`, newPostId), newPostNode);
-      setPosts(prev => [newPostNode, ...prev]);
-      setActivePost(newPostNode);
-
-      // Trigger Webhook notification to send phone alert
-      if (config?.webhookEnabled && config?.webhookUrl) {
-        await fetch(config.webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: `🔔 New Media Proposed: "${selectedFile.name}"! Click review inside poster app.`,
-            title: 'Social Poster Review',
-            message: `Three caption alternatives ready for edits!`,
-          }),
-        });
-      }
-
-      await createSystemLog(user.uid, 'success', `Generated 3 custom captions for photo: '${selectedFile.name}'! Notification sent to phone.`);
-
     } catch (err: any) {
       console.error(err);
-      await createSystemLog(user.uid, 'error', `Polling event error: ${err.message || err}`);
       const rawMsg = err.message || String(err);
+      await createSystemLog(user.uid, 'error', `Polling event error: ${rawMsg}`);
       if (isRateLimitError(rawMsg)) {
         triggerBanner('⚡ AI rate limit reached — the model is temporarily busy. This usually resolves in a minute. Your files are safe, no action needed.');
       } else {
@@ -1063,25 +1120,22 @@ export default function App() {
 
       await createSystemLog(user.uid, 'success', logMsg);
 
-      // Now move file inside Drive under "posted" folder
-      // Now move file inside Drive under "posted" folder
+      // Now move file inside Drive under "posted" folder (uses service account fallback if browser token expired)
       if (activePost.driveFileId) {
         const activeToken = await getFreshDriveToken();
-        if (activeToken) {
-          await createSystemLog(user.uid, 'info', `Moving Google Drive file ${activePost.driveFileId} to 'posted' subfolder...`);
-          const moveRes = await fetch(getApiUrl('/api/drive/move-file'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileId: activePost.driveFileId,
-              parentFolderId: config?.driveFolderId,
-              destinationFolderName: 'posted',
-              gdriveToken: activeToken,
-            }),
-          });
-          if (moveRes.ok) {
-            await createSystemLog(user.uid, 'info', 'Google Drive file archiving completed successfully.');
-          }
+        await createSystemLog(user.uid, 'info', `Moving Google Drive file ${activePost.driveFileId} to 'posted' subfolder...`);
+        const moveRes = await fetch(getApiUrl('/api/drive/move-file'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileId: activePost.driveFileId,
+            parentFolderId: config?.driveFolderId,
+            destinationFolderName: 'posted',
+            gdriveToken: activeToken || 'SERVICE_ACCOUNT',
+          }),
+        });
+        if (moveRes.ok) {
+          await createSystemLog(user.uid, 'info', 'Google Drive file archiving completed successfully.');
         }
       }
 
@@ -1101,7 +1155,7 @@ export default function App() {
       if (config) {
         const nextTime = getNextScheduledTime(config.minIntervalHours, config.maxIntervalHours);
         const updatedConfig = { ...config, nextPostTime: nextTime };
-        await setDoc(doc(db, `users/${user.uid}`), updatedConfig);
+        await setDoc(doc(db, `users/${user.uid}`), updatedConfig, { merge: true });
         setConfig(updatedConfig);
         await createSystemLog(user.uid, 'info', `Rescheduled next automated polling loop for: ${new Date(nextTime).toLocaleTimeString()}`);
       }
@@ -1129,19 +1183,17 @@ export default function App() {
     try {
       if (activePost.driveFileId) {
         const activeToken = await getFreshDriveToken();
-        if (activeToken) {
-          await createSystemLog(user.uid, 'info', `Archiving Google Drive file to 'skipped' subfolder...`);
-          await fetch(getApiUrl('/api/drive/move-file'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileId: activePost.driveFileId,
-              parentFolderId: config?.driveFolderId,
-              destinationFolderName: 'skipped',
-              gdriveToken: activeToken,
-            }),
-          });
-        }
+        await createSystemLog(user.uid, 'info', `Archiving Google Drive file to 'skipped' subfolder...`);
+        await fetch(getApiUrl('/api/drive/move-file'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileId: activePost.driveFileId,
+            parentFolderId: config?.driveFolderId,
+            destinationFolderName: 'skipped',
+            gdriveToken: activeToken || 'SERVICE_ACCOUNT',
+          }),
+        });
       }
 
       const updatedNode: PostItem = {
@@ -1158,7 +1210,7 @@ export default function App() {
       if (config) {
         const nextTime = getNextScheduledTime(config.minIntervalHours, config.maxIntervalHours);
         const updatedConfig = { ...config, nextPostTime: nextTime };
-        await setDoc(doc(db, `users/${user.uid}`), updatedConfig);
+        await setDoc(doc(db, `users/${user.uid}`), updatedConfig, { merge: true });
         setConfig(updatedConfig);
       }
 
@@ -1300,6 +1352,31 @@ export default function App() {
             </div>
           ) : null}
 
+          {/* Chrome Push Prompt Banner when this device isn't subscribed yet */}
+          {isWebPushSupported() && !isThisDeviceSubscribed && (config?.pushNotificationsEnabled ?? true) && (
+            <div className="glass border-brand-gold/30 px-4 py-3 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 text-xs">
+                <div className="w-8 h-8 rounded-xl bg-brand-gold/15 text-brand-gold flex items-center justify-center shrink-0">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-text-main">Enable Chrome Notifications on this device</p>
+                  <p className="text-[11px] text-text-muted">
+                    Get alerted on your phone when the 24/7 cloud timer drafts a new post — even when Chrome is closed.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleEnablePush}
+                disabled={isPushBusy}
+                className="px-4 py-2 btn-gold font-bold text-xs rounded-xl shrink-0 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Bell className="w-3.5 h-3.5" />
+                {isPushBusy ? 'Enabling...' : 'Enable Notifications'}
+              </button>
+            </div>
+          )}
+
           {/* Core Controls Rail */}
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between glass rounded-2xl p-4 shadow-sm">
             
@@ -1311,7 +1388,11 @@ export default function App() {
               </div>
               <div className="flex items-center gap-2 border bg-black/30 rounded-xl px-3 py-1.5 border-brand-gold/10">
                 <div className={`w-2 h-2 rounded-full ${config?.isPollingActive ? 'bg-amber-400 animate-ping' : 'bg-stone-600'}`} />
-                <span>Scheduler: <strong className="text-text-main font-semibold">{config?.isPollingActive ? 'Online Running' : 'Standby'}</strong></span>
+                <span>Scheduler: <strong className="text-text-main font-semibold">{config?.isPollingActive ? '24/7 Cloud Running' : 'Standby'}</strong></span>
+              </div>
+              <div className="flex items-center gap-2 border bg-black/30 rounded-xl px-3 py-1.5 border-brand-gold/10">
+                <Bell className={`w-3.5 h-3.5 ${isThisDeviceSubscribed ? 'text-emerald-400' : 'text-stone-500'}`} />
+                <span>Push: <strong className="text-text-main font-semibold">{subscribedDeviceCount} device{subscribedDeviceCount === 1 ? '' : 's'}</strong></span>
               </div>
               <div className="flex items-center gap-2 border bg-black/30 rounded-xl px-3 py-1.5 border-brand-gold/10 font-mono">
                 <span>Targets:</span>
@@ -1369,7 +1450,10 @@ export default function App() {
                       </span>
                     </div>
                     <button
-                      onClick={() => setActivePost(null)}
+                      onClick={() => {
+                        dismissedPostIdRef.current = activePost.id;
+                        setActivePost(null);
+                      }}
                       className="text-[10px] text-stone-500 hover:text-stone-300 font-semibold transition cursor-pointer px-2 py-1 rounded-lg hover:bg-white/5"
                     >
                       Dismiss ✕
@@ -1625,6 +1709,13 @@ export default function App() {
               config={config}
               onSave={handleSaveConfig}
               isLoading={isSavingConfig}
+              serviceAccountEmail={serviceAccountEmail}
+              isThisDeviceSubscribed={isThisDeviceSubscribed}
+              subscribedDeviceCount={subscribedDeviceCount}
+              isPushBusy={isPushBusy}
+              onEnablePush={handleEnablePush}
+              onDisablePush={handleDisablePush}
+              onTestPush={handleTestPush}
             />
           )}
 

@@ -65,6 +65,11 @@ service cloud.firestore {
         allow update: if isOwner(userId) && isValidLogItem(request.resource.data);
         allow delete: if isOwner(userId);
       }
+
+      // Match user's Chrome Web Push subscriptions (written via authenticated backend)
+      match /pushSubscriptions/{subId} {
+        allow read, delete: if isOwner(userId);
+      }
     }
   }
 }

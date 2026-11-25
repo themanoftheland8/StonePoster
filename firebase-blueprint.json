@@ -20,6 +20,7 @@
         "twitterEnabled": { "type": "boolean" },
         "webhookUrl": { "type": "string" },
         "webhookEnabled": { "type": "boolean" },
+        "pushNotificationsEnabled": { "type": "boolean" },
         "updatedAt": { "type": "integer" }
       },
       "required": ["driveFolderId"]

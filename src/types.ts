@@ -14,8 +14,17 @@ export interface UserConfig {
   twitterEnabled: boolean;
   webhookUrl?: string;
   webhookEnabled: boolean;
+  pushNotificationsEnabled?: boolean;
   backendUrl?: string;
   updatedAt?: number;
+}
+
+export interface PushSubscriptionRecord {
+  id: string;
+  endpoint: string;
+  deviceLabel?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface PostItem {

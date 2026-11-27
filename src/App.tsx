@@ -1261,147 +1261,175 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg-dark text-text-main font-sans flex flex-col selection:bg-brand-gold/20 selection:text-brand-gold">
       
-      {/* Absolute Header Menu */}
-      <header className="sticky top-0 z-40 glass-premium border-b border-brand-gold/15 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-brand-gold-dark via-brand-gold to-yellow-200 shadow-md shadow-brand-gold/15 flex items-center justify-center text-bg-dark font-display font-black text-xs sm:text-sm shrink-0">
-            SCM
+      {/* Top Navigation Header */}
+      <header className="sticky top-0 z-40 glass-premium border-b border-white/10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img src="/icon-192.png" alt="SCM" className="w-7 h-7 rounded-lg shrink-0" />
+            <h1 className="font-semibold text-zinc-100 tracking-tight text-sm sm:text-base truncate">
+              StoneContentManager
+            </h1>
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="font-display font-bold text-text-main tracking-tight text-xs sm:text-base md:text-lg truncate">StoneContentManager</h1>
-              <span className="px-1.5 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold text-[8px] sm:text-[9px] font-mono leading-none tracking-wider font-extrabold uppercase border border-brand-gold/30">
-                {versionInfo.version}
-              </span>
-            </div>
-            <p className="text-[8px] sm:text-[10px] text-brand-gold/75 font-mono uppercase tracking-wider font-semibold truncate">Automatic Polling & Gemini Vision Copywriting</p>
-          </div>
+
+          {user && (
+            <>
+              {/* Desktop navigation */}
+              <nav className="hidden md:flex items-center bg-white/[0.04] border border-white/10 p-0.5 rounded-xl">
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'dashboard' ? 'bg-white/12 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" /> Review
+                </button>
+                <button
+                  onClick={() => setActiveTab('config')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'config' ? 'bg-white/12 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <Settings className="w-3.5 h-3.5" /> Settings
+                </button>
+                <button
+                  onClick={() => setActiveTab('logs')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'logs' ? 'bg-white/12 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <Terminal className="w-3.5 h-3.5" /> Logs
+                </button>
+              </nav>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="hidden sm:inline text-xs text-zinc-400 truncate max-w-[180px]">
+                  {user.email}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 text-zinc-400 hover:text-red-400 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                  title="Sign out"
+                  aria-label="Sign out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
+        {/* Mobile navigation */}
         {user && (
-          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-            <div className="hidden sm:flex flex-col text-right">
-              <span className="text-xs font-semibold text-text-main">{user.email}</span>
-              <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-brand-gold">Active Operator</span>
-            </div>
-            
+          <div className="md:hidden border-t border-white/5 px-4 py-1.5 flex gap-1 bg-black/30">
             <button
-              onClick={handleLogout}
-              className="p-1.5 sm:p-2 text-stone-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer"
-              title="Terminate Secure Session"
+              onClick={() => setActiveTab('dashboard')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'dashboard' ? 'bg-white/12 text-zinc-100' : 'text-zinc-400'
+              }`}
             >
-              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Smartphone className="w-3.5 h-3.5" /> Review
+            </button>
+            <button
+              onClick={() => setActiveTab('config')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'config' ? 'bg-white/12 text-zinc-100' : 'text-zinc-400'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5" /> Settings
+            </button>
+            <button
+              onClick={() => setActiveTab('logs')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'logs' ? 'bg-white/12 text-zinc-100' : 'text-zinc-400'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5" /> Logs
             </button>
           </div>
         )}
       </header>
 
       {hostingDiagnosticWarning && (
-        <div className="bg-amber-950/40 border-b border-amber-500/20 px-4 py-3 text-xs text-amber-200">
-          <div className="max-w-7xl mx-auto flex items-start gap-3 text-left">
-            <Shield className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <span className="text-amber-300 font-semibold block">Cloud Functions Backend Pending Deployment:</span>
-              <p className="leading-relaxed text-amber-200/90 font-semibold">
-                {hostingDiagnosticWarning}
-              </p>
-              <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                By default, static hosting rewrites all non-existent paths back to <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">index.html</code>. 
-                This causes backend API routes (e.g. <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">/api/health</code>, <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">/api/drive/upload</code>) to return static HTML content instead of JSON payload.
-              </p>
-              <p className="text-[11px] text-amber-400/90">
-                💡 <span className="font-semibold">How to resolve:</span> Open your terminal and run <strong className="text-amber-300">firebase deploy</strong>. 
-                This compiles your server files and deploys both the frontend and the Express API as a Firebase Cloud Function.
-              </p>
-            </div>
+        <div className="bg-amber-950/50 border-b border-amber-500/20 px-4 py-2.5 text-xs text-amber-200">
+          <div className="max-w-6xl mx-auto flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <p className="leading-snug">{hostingDiagnosticWarning}</p>
           </div>
         </div>
       )}
 
       {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-20">
-          <RotateCw className="w-8 h-8 text-brand-gold animate-spin mb-4" />
-          <p className="text-sm font-semibold text-text-muted">Verifying secure keys...</p>
+        <div className="flex-1 flex flex-col items-center justify-center py-20 gap-3">
+          <RotateCw className="w-6 h-6 text-zinc-400 animate-spin" />
+          <p className="text-xs text-zinc-400">Loading workspace...</p>
         </div>
       ) : !user ? (
-        
-        /* UNAUTHENTICATED LOGIN BOARD */
-        <main className="flex-1 max-w-lg mx-auto w-full flex flex-col justify-center px-4 py-16">
-          <div className="glass rounded-3xl p-8 shadow-2xl text-center space-y-6">
-            <div className="w-16 h-16 rounded-2xl bg-brand-gold/10 text-brand-gold mx-auto flex items-center justify-center">
-              <Compass className="w-8 h-8 animate-pulse" />
-            </div>
+
+        /* Sign-in Screen */
+        <main className="flex-1 max-w-md mx-auto w-full flex flex-col justify-center px-4 py-16">
+          <div className="bg-surface-dark border border-white/10 rounded-2xl p-8 text-center space-y-6">
+            <img src="/icon-192.png" alt="StoneContentManager" className="w-12 h-12 rounded-xl mx-auto" />
 
             <div className="space-y-2">
-              <h2 className="font-display font-bold text-text-main text-2xl tracking-tight">Content Pipeline Automation</h2>
-              <p className="text-sm text-text-muted leading-relaxed px-2">
-                Poll customized Google Drive repositories, draft engaging caption alternatives using Gemini Vision AI, and publish directly onto X/Twitter and Bluesky.
+              <h2 className="font-semibold text-zinc-100 text-xl tracking-tight">StoneContentManager</h2>
+              <p className="text-sm text-zinc-400 leading-relaxed">
+                Draft captions from Google Drive photos with Gemini and publish to Bluesky and X.
               </p>
             </div>
 
-            <div className="bg-brand-gold/5 text-gold-200 p-4 rounded-2xl text-xs flex items-start gap-3 border border-brand-gold/20 text-left">
-              <Shield className="w-4 h-4 text-brand-gold shrink-0 mt-0.5" />
-              <p className="leading-relaxed text-text-muted">
-                <strong className="text-brand-gold font-medium">Google Auth & Permissions:</strong> Sign-In configures secure, in-memory API interactions to traverse folder layouts and move processed images, with permission from your account. The platform protects your identity.
-              </p>
-            </div>
-
-            {/* Custom Google Material Sign In Button */}
             <button
               onClick={handleLogin}
-              className="w-full flex items-center justify-center gap-3 bg-[#111115] hover:bg-[#15151b] border border-brand-gold/15 shadow-sm rounded-xl py-3 px-4 text-sm font-semibold text-text-main active:bg-[#0a0a0c] transition-all font-sans cursor-pointer active-glow"
+              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-zinc-900 rounded-xl py-3 px-4 text-sm font-semibold transition cursor-pointer"
             >
-              <svg className="w-5 h-5 shrink-0" viewBox="0 0 48 48">
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 48 48">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
                 <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
                 <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
                 <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
               </svg>
-              Sign in with Google Account
+              Sign in with Google
             </button>
           </div>
         </main>
       ) : (
-        
-        /* AUTHENTICATED PANEL WORKSPACE */
-        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6">
-          
-          {/* Welcome Alert for First Time logins */}
-          {isFirstTimeLogin ? (
-            <div className="glass border-brand-gold/40 p-6 shadow-md flex flex-col md:flex-row gap-5 items-center justify-between rounded-2xl">
-              <div className="space-y-1">
-                <h3 className="font-display font-medium text-lg text-brand-gold tracking-tight">🔧 Complete Social Keys Configuration</h3>
-                <p className="text-xs text-text-muted leading-relaxed max-w-xl">
-                  Welcome to your new Content Poster! Please define your API credentials for X/Twitter, Bluesky handles, and custom Google Drive locations right now so the automation engine can launch.
+
+        /* Authenticated Workspace */
+        <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-6 space-y-5">
+
+          {/* First-time setup callout */}
+          {isFirstTimeLogin && (
+            <div className="bg-surface-dark border border-amber-500/30 p-4 rounded-2xl flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-zinc-100">Finish connecting your accounts</p>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Add your Bluesky or X credentials and Drive folder in Settings to start publishing.
                 </p>
               </div>
               <button
                 onClick={() => setActiveTab('config')}
-                className="px-5 py-2.5 btn-gold font-bold text-xs rounded-xl hover:opacity-90 transition shrink-0 uppercase tracking-wider"
+                className="px-4 py-2 btn-gold text-xs rounded-xl shrink-0 cursor-pointer"
               >
-                Go to Configuration Area
+                Open Settings
               </button>
             </div>
-          ) : null}
+          )}
 
-          {/* Chrome Push Prompt Banner when this device isn't subscribed yet */}
+          {/* Chrome Push Prompt Banner */}
           {isWebPushSupported() && !isThisDeviceSubscribed && (config?.pushNotificationsEnabled ?? true) && (
-            <div className="glass border-brand-gold/30 px-4 py-3 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="bg-surface-dark border border-white/10 px-4 py-3 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3 text-xs">
-                <div className="w-8 h-8 rounded-xl bg-brand-gold/15 text-brand-gold flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
                   <Bell className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="font-semibold text-text-main">Enable Chrome Notifications on this device</p>
-                  <p className="text-[11px] text-text-muted">
-                    Get alerted on your phone when the 24/7 cloud timer drafts a new post — even when Chrome is closed.
-                  </p>
+                  <p className="font-medium text-zinc-100">Enable Chrome notifications on this device</p>
+                  <p className="text-zinc-400">Get alerted when a scheduled draft is ready to review.</p>
                 </div>
               </div>
               <button
                 onClick={handleEnablePush}
                 disabled={isPushBusy}
-                className="px-4 py-2 btn-gold font-bold text-xs rounded-xl shrink-0 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                className="px-3.5 py-2 btn-gold text-xs rounded-xl shrink-0 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
               >
                 <Bell className="w-3.5 h-3.5" />
                 {isPushBusy ? 'Enabling...' : 'Enable Notifications'}
@@ -1409,76 +1437,56 @@ export default function App() {
             </div>
           )}
 
-          {/* Core Controls Rail */}
-          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between glass rounded-2xl p-4 shadow-sm">
-            
-            {/* Quick Status Bar */}
-            <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-text-muted">
-              <div className="flex items-center gap-2 border bg-black/30 rounded-xl px-3 py-1.5 border-brand-gold/10">
-                <Clock className="w-4 h-4 text-brand-gold shrink-0" />
-                <span>Next Auto-Poll: <strong className="text-text-main font-mono">{countdownStr}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 border bg-black/30 rounded-xl px-3 py-1.5 border-brand-gold/10">
-                <div className={`w-2 h-2 rounded-full ${config?.isPollingActive ? 'bg-amber-400 animate-ping' : 'bg-stone-600'}`} />
-                <span>Scheduler: <strong className="text-text-main font-semibold">{config?.isPollingActive ? '24/7 Cloud Running' : 'Standby'}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 border bg-black/30 rounded-xl px-3 py-1.5 border-brand-gold/10">
-                <Bell className={`w-3.5 h-3.5 ${isThisDeviceSubscribed ? 'text-emerald-400' : 'text-stone-500'}`} />
-                <span>Push: <strong className="text-text-main font-semibold">{subscribedDeviceCount} device{subscribedDeviceCount === 1 ? '' : 's'}</strong></span>
-              </div>
-              <div className="flex items-center gap-2 border bg-black/30 rounded-xl px-3 py-1.5 border-brand-gold/10 font-mono">
-                <span>Targets:</span>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] ${config?.blueskyEnabled ? 'bg-brand-gold/20 text-brand-gold border border-brand-gold/15 font-bold' : 'bg-stone-800 text-stone-500'}`}>BSky</span>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] ${config?.twitterEnabled ? 'bg-text-main text-bg-dark border border-stone-700 font-bold' : 'bg-stone-800 text-stone-500'}`}>X</span>
-              </div>
-            </div>
-
-            {/* Navigation Tabs */}
-            <div className="flex w-full sm:w-auto overflow-x-auto no-scrollbar scroll-smooth bg-[#111115] border border-brand-gold/10 p-1 rounded-xl shrink-0">
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
-                  activeTab === 'dashboard' ? 'bg-gradient-to-tr from-[#efe2b6] to-[#d4af37] text-stone-950 shadow-sm' : 'text-stone-400 hover:text-text-main'
-                }`}
-              >
-                <Smartphone className="w-3.5 h-3.5" /> Dashboard Preview
-              </button>
-              <button
-                onClick={() => setActiveTab('logs')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
-                  activeTab === 'logs' ? 'bg-gradient-to-tr from-[#efe2b6] to-[#d4af37] text-stone-950 shadow-sm' : 'text-stone-400 hover:text-text-main'
-                }`}
-              >
-                <Terminal className="w-3.5 h-3.5" /> System Logs
-              </button>
-              <button
-                onClick={() => setActiveTab('config')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
-                  activeTab === 'config' ? 'bg-gradient-to-tr from-[#efe2b6] to-[#d4af37] text-stone-950 shadow-sm' : 'text-stone-400 hover:text-text-main'
-                }`}
-              >
-                <Settings className="w-3.5 h-3.5" /> Configure Integrations
-              </button>
-            </div>
-
-          </div>
-
-          {/* ACTIVE WORKSPACE AREA */}
+          {/* Review Workspace */}
           {activeTab === 'dashboard' && (
-            <div className="space-y-6">
+            <div className="space-y-5">
 
-              {/* ── FEATURED DRAFT REVIEW PANEL ── shows at top when a draft is active */}
+              {/* Compact Status Strip */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-dark border border-white/10 rounded-2xl px-4 py-3 text-xs">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-zinc-400">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${config?.isPollingActive ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                    <span>
+                      {config?.isPollingActive ? 'Next poll:' : 'Scheduler:'}{' '}
+                      <strong className="text-zinc-100 font-mono font-medium">{countdownStr}</strong>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span>Targets:</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${config?.blueskyEnabled ? 'bg-sky-500/15 text-sky-300' : 'bg-white/5 text-zinc-500'}`}>
+                      Bluesky
+                    </span>
+                    <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${config?.twitterEnabled ? 'bg-white/15 text-zinc-100' : 'bg-white/5 text-zinc-500'}`}>
+                      X
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <Bell className={`w-3.5 h-3.5 ${isThisDeviceSubscribed ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                    <span>{subscribedDeviceCount} device{subscribedDeviceCount === 1 ? '' : 's'}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handlePollAndPickRandom}
+                  disabled={isPolling || isProcessing}
+                  className="px-3 py-1.5 btn-gold-outline text-xs rounded-lg disabled:opacity-50 cursor-pointer flex items-center gap-1.5 ml-auto"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isPolling ? 'animate-spin' : ''}`} />
+                  {isPolling ? 'Scanning...' : 'Poll Drive Now'}
+                </button>
+              </div>
+
+              {/* Draft Review Panel */}
               {activePost ? (
-                <div className="glass rounded-2xl overflow-hidden border border-brand-gold/25 shadow-xl">
-                  {/* Panel header */}
-                  <div className="flex items-center justify-between px-5 py-3 border-b border-brand-gold/15 bg-black/40">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                      <span className="text-xs font-bold font-mono uppercase tracking-wider text-brand-gold">
-                        Draft Pending Review
-                      </span>
-                      <span className="text-[10px] text-stone-500 font-mono truncate max-w-[160px] hidden sm:block">
-                        — {activePost.fileName}
+                <div className="bg-surface-dark border border-white/12 rounded-2xl overflow-hidden" id="phone-simulator">
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      <span className="text-xs font-semibold text-zinc-100">Ready to Review</span>
+                      <span className="text-xs text-zinc-500 truncate hidden sm:inline">
+                        {activePost.fileName}
                       </span>
                     </div>
                     <button
@@ -1486,176 +1494,168 @@ export default function App() {
                         dismissedPostIdRef.current = activePost.id;
                         setActivePost(null);
                       }}
-                      className="text-[10px] text-stone-500 hover:text-stone-300 font-semibold transition cursor-pointer px-2 py-1 rounded-lg hover:bg-white/5"
+                      className="text-xs text-zinc-500 hover:text-zinc-200 transition cursor-pointer p-1 rounded-md hover:bg-white/5"
+                      aria-label="Dismiss draft"
                     >
-                      Dismiss ✕
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
 
-                  {/* Two-column body: photo left, controls right */}
-                  <div className="flex flex-col md:flex-row">
-
-                    {/* LEFT: Photo preview */}
-                    <div className="relative md:w-1/2 bg-black flex items-center justify-center min-h-[260px] overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-2">
+                    {/* Media Preview */}
+                    <div className="relative bg-black flex items-center justify-center min-h-[260px] md:min-h-[420px] border-b md:border-b-0 md:border-r border-white/10">
                       <img
                         src={activePost.imageUrl}
                         alt={activePost.fileName}
                         referrerPolicy="no-referrer"
-                        className="w-full h-full object-contain max-h-[480px]"
+                        className="w-full h-full object-contain max-h-[460px]"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
-                      {/* Crop button */}
                       {activePost.mimeType?.startsWith('image/') && (
                         <button
                           onClick={() => setIsCropping(true)}
-                          className="absolute top-3 right-3 px-3 py-1.5 bg-black/70 hover:bg-black/90 backdrop-blur-sm border border-brand-gold/30 text-brand-gold text-[11px] font-bold rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+                          className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/75 hover:bg-black/90 backdrop-blur-sm border border-white/15 text-zinc-100 text-xs font-medium rounded-lg flex items-center gap-1.5 transition cursor-pointer"
                         >
-                          <Crop className="w-3.5 h-3.5" /> Crop Photo
+                          <Crop className="w-3.5 h-3.5" /> Crop
                         </button>
                       )}
                     </div>
 
-                    {/* RIGHT: Caption controls */}
-                    <div className="md:w-1/2 flex flex-col p-5 space-y-5 overflow-y-auto max-h-[480px] no-scrollbar">
-
-                      {/* Caption Options */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-gold flex items-center gap-1.5">
-                            <Sparkles className="w-3 h-3" /> Caption Options
-                          </span>
-                          <button
-                            onClick={handleRegenerateCaptions}
-                            disabled={isRegenerating}
-                            className="text-[10px] text-stone-400 hover:text-brand-gold font-semibold transition cursor-pointer disabled:opacity-50 flex items-center gap-1"
-                          >
-                            <RotateCw className={`w-3 h-3 ${isRegenerating ? 'animate-spin' : ''}`} />
-                            {isRegenerating ? 'Regenerating...' : 'Regenerate All'}
-                          </button>
-                        </div>
+                    {/* Caption Picker & Editor */}
+                    <div className="p-5 flex flex-col justify-between gap-4">
+                      <div className="space-y-4">
                         <div className="space-y-2">
-                          {activePost.captions.map((cap, i) => (
-                            <div
-                              key={i}
-                              onClick={() => {
-                                setSelectedIdx(i);
-                                setEditedCaption(cap);
-                                handleSelectCaption(cap);
-                              }}
-                              className={`p-3 rounded-xl border cursor-pointer transition ${
-                                selectedIdx === i
-                                  ? 'bg-brand-gold/10 border-brand-gold/50'
-                                  : 'bg-black/30 border-stone-800 hover:border-brand-gold/30'
-                              }`}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-zinc-400">Pick a caption</span>
+                            <button
+                              onClick={handleRegenerateCaptions}
+                              disabled={isRegenerating}
+                              className="text-xs text-zinc-400 hover:text-zinc-100 font-medium transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                             >
-                              <div className="flex items-start gap-2.5">
-                                <span className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition ${selectedIdx === i ? 'bg-brand-gold border-brand-gold' : 'border-stone-600'}`}>
-                                  {selectedIdx === i && <Check className="w-2.5 h-2.5 text-stone-950" />}
+                              <RotateCw className={`w-3.5 h-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
+                              {isRegenerating ? 'Regenerating...' : 'Regenerate'}
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            {activePost.captions.map((cap, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedIdx(i);
+                                  setEditedCaption(cap);
+                                  handleSelectCaption(cap);
+                                }}
+                                className={`w-full text-left p-3 rounded-xl border transition flex items-start gap-3 cursor-pointer ${
+                                  selectedIdx === i
+                                    ? 'bg-white/[0.07] border-white/25 text-zinc-100'
+                                    : 'bg-black/25 border-white/8 text-zinc-300 hover:border-white/20'
+                                }`}
+                              >
+                                <span
+                                  className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border flex items-center justify-center transition ${
+                                    selectedIdx === i
+                                      ? 'bg-zinc-100 border-zinc-100 text-zinc-950'
+                                      : 'border-zinc-600'
+                                  }`}
+                                >
+                                  {selectedIdx === i && <Check className="w-2.5 h-2.5" />}
                                 </span>
-                                <div className="min-w-0">
-                                  <span className="text-[9px] text-brand-gold/70 font-bold font-mono block mb-0.5">OPTION {i + 1}</span>
-                                  <p className="text-xs text-text-main leading-relaxed">{cap}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                                <span className="text-xs leading-relaxed">{cap}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <label className="font-medium text-zinc-400">Edit caption</label>
+                            <span className={`font-mono text-[11px] ${editedCaption.length > 280 ? 'text-amber-400' : 'text-zinc-500'}`}>
+                              {editedCaption.length} / 300
+                            </span>
+                          </div>
+                          <textarea
+                            value={editedCaption}
+                            onChange={(e) => {
+                              setEditedCaption(e.target.value);
+                              handleSelectCaption(e.target.value);
+                            }}
+                            rows={3}
+                            className="w-full bg-black/40 border border-white/10 focus:border-white/30 text-zinc-100 text-sm rounded-xl px-3.5 py-2.5 outline-none resize-none transition placeholder:text-zinc-600 leading-relaxed"
+                            placeholder="Write or refine your caption..."
+                          />
                         </div>
                       </div>
 
-                      {/* Caption editor */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-brand-gold flex items-center gap-1.5">
-                          <MessageSquare className="w-3 h-3" /> Edit Caption
-                        </label>
-                        <textarea
-                          value={editedCaption}
-                          onChange={(e) => {
-                            setEditedCaption(e.target.value);
-                            handleSelectCaption(e.target.value);
-                          }}
-                          rows={4}
-                          className="w-full bg-black/50 border border-brand-gold/15 focus:border-brand-gold/40 text-text-main text-xs rounded-xl px-4 py-3 outline-none resize-none transition font-sans placeholder:text-stone-600 focus:ring-1 focus:ring-brand-gold/20 leading-relaxed"
-                          placeholder="Edit your caption before posting..."
-                        />
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div className="flex items-center gap-2.5 pt-2">
                         <button
                           onClick={handleSkipProposal}
-                          className="py-3 bg-stone-900 border border-stone-700 hover:border-red-500/40 hover:bg-red-950/20 text-stone-400 hover:text-red-400 text-xs font-bold rounded-xl transition cursor-pointer"
+                          className="px-4 py-2.5 bg-white/[0.04] border border-white/10 hover:bg-red-500/10 hover:border-red-500/30 text-zinc-300 hover:text-red-300 text-xs font-medium rounded-xl transition cursor-pointer"
                         >
-                          Skip Draft
+                          Skip
                         </button>
                         <button
                           onClick={() => handlePublishContent(editedCaption)}
                           disabled={isPublishing}
-                          className="py-3 btn-gold text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                          className="flex-1 py-2.5 btn-gold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                         >
-                          <Share2 className="w-4 h-4" />
-                          {isPublishing ? 'Publishing...' : 'Publish Now'}
+                          <Share2 className="w-3.5 h-3.5" />
+                          {isPublishing
+                            ? 'Publishing...'
+                            : config?.blueskyEnabled && config?.twitterEnabled
+                              ? 'Publish to Bluesky & X'
+                              : config?.blueskyEnabled
+                                ? 'Publish to Bluesky'
+                                : config?.twitterEnabled
+                                  ? 'Publish to X'
+                                  : 'Publish Now'}
                         </button>
                       </div>
-                      <p className="text-[10px] text-stone-600 text-center">Publishes simultaneously to X & Bluesky</p>
-
                     </div>
                   </div>
                 </div>
               ) : (
-                /* No active draft: subtle prompt banner */
-                <div className="glass rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-4 justify-between border border-brand-gold/10">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-brand-gold/10 text-brand-gold flex items-center justify-center shrink-0">
-                      <Eye className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-text-main">No draft pending review</p>
-                      <p className="text-xs text-text-muted">Poll your Drive folder or upload a photo below to get started.</p>
-                    </div>
+                <div className="bg-surface-dark border border-white/10 rounded-2xl p-5 flex items-center gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-zinc-400 flex items-center justify-center shrink-0">
+                    <Eye className="w-4 h-4" />
                   </div>
-                  <button
-                    onClick={handlePollAndPickRandom}
-                    disabled={isPolling || isProcessing}
-                    className="px-5 py-2.5 btn-gold font-bold text-xs rounded-xl disabled:opacity-50 transition shrink-0 cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {isPolling ? 'Scanning...' : 'Poll Drive Now'}
-                  </button>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-zinc-200">No draft waiting</p>
+                    <p className="text-xs text-zinc-500">
+                      Click <strong className="text-zinc-300">Poll Drive Now</strong> above, upload a file below, or wait for the next scheduled check.
+                    </p>
+                  </div>
                 </div>
               )}
 
-              {/* ── ACTION HUB: Poll banner + Upload + History ── always shown below */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-                {/* Left: Upload */}
-                <div className="lg:col-span-7">
+              {/* Upload & Recent Posts */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                <div className="lg:col-span-6">
                   <ManualUploadCard onUpload={handleManualUploadFlow} isProcessing={isProcessing} />
                 </div>
 
-                {/* Right: History */}
-                <div className="lg:col-span-5">
-                  <div className="glass rounded-2xl p-6 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between border-b border-brand-gold/10 pb-3">
-                      <div className="flex items-center gap-2.5">
-                        <History className="w-5 h-5 text-brand-gold" />
-                        <h3 className="font-display font-medium text-text-main text-sm">Processed Assets</h3>
-                      </div>
-                      <span className="text-xs font-mono bg-black/40 text-brand-gold px-2.5 py-1 rounded-full border border-brand-gold/15">{posts.length} entries</span>
+                <div className="lg:col-span-6">
+                  <div className="bg-surface-dark border border-white/10 rounded-2xl p-5 space-y-3.5">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-zinc-100">Recent Posts</h3>
+                      <span className="text-xs font-mono text-zinc-500">{posts.length}</span>
                     </div>
 
                     {posts.length === 0 ? (
-                      <div className="py-10 text-center text-text-muted text-xs">
+                      <div className="py-10 text-center text-zinc-500 text-xs">
                         No posts processed yet.
                       </div>
                     ) : (
-                      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1 no-scrollbar">
+                      <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 no-scrollbar">
                         {posts.map((post) => (
                           <div
                             key={post.id}
-                            className={`flex items-start gap-3 p-3 border rounded-xl transition cursor-pointer ${
+                            className={`flex items-start gap-3 p-2.5 border rounded-xl transition ${
+                              post.status === 'pending_review' ? 'cursor-pointer' : ''
+                            } ${
                               activePost?.id === post.id
-                                ? 'bg-brand-gold/10 border-brand-gold/40'
-                                : 'bg-black/25 hover:bg-black/40 border-brand-gold/5 hover:border-brand-gold/15'
+                                ? 'bg-white/[0.06] border-white/25'
+                                : 'bg-black/25 border-white/5 hover:border-white/15'
                             }`}
                             onClick={() => post.status === 'pending_review' ? setActivePost(post) : undefined}
                           >
@@ -1663,26 +1663,28 @@ export default function App() {
                               src={post.imageUrl}
                               alt={post.fileName}
                               referrerPolicy="no-referrer"
-                              className="w-11 h-11 rounded-lg object-cover bg-stone-900 shrink-0 border border-brand-gold/10 mt-0.5"
+                              className="w-11 h-11 rounded-lg object-cover bg-zinc-900 shrink-0 border border-white/10"
                             />
                             <div className="flex-1 min-w-0">
-                              <h4 className="text-xs font-semibold text-text-main truncate">{post.fileName}</h4>
-                              <p className="text-[10px] text-text-muted mt-1 leading-normal whitespace-pre-wrap">{post.selectedCaption || 'No caption...'}</p>
-                            </div>
-                            <div className="shrink-0 mt-0.5">
-                              {post.status === 'posted' ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/40 text-emerald-300 border border-emerald-500/30">
-                                  <CheckCircle className="w-3 h-3" /> Posted
-                                </span>
-                              ) : post.status === 'skipped' ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-950/40 text-red-300 border border-red-500/30">
-                                  <XCircle className="w-3 h-3" /> Skipped
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/40 text-amber-300 border border-amber-500/30">
-                                  Review
-                                </span>
-                              )}
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className="text-xs font-medium text-zinc-200 truncate">{post.fileName}</h4>
+                                {post.status === 'posted' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 shrink-0">
+                                    Posted
+                                  </span>
+                                ) : post.status === 'skipped' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-zinc-800 text-zinc-400 shrink-0">
+                                    Skipped
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/15 text-amber-300 shrink-0">
+                                    Review
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed">
+                                {post.selectedCaption || 'No caption'}
+                              </p>
                             </div>
                           </div>
                         ))}
@@ -1690,44 +1692,36 @@ export default function App() {
                     )}
                   </div>
                 </div>
-
               </div>
             </div>
           )}
 
           {/* Logs Tab */}
           {activeTab === 'logs' && (
-            <div className="glass rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-brand-gold/10 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <Terminal className="w-5 h-5 text-brand-gold" />
-                  <h3 className="font-display font-medium text-text-main text-sm">System Log Terminal</h3>
-                </div>
+            <div className="bg-surface-dark border border-white/10 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-zinc-100">Activity Logs</h3>
                 <button
                   onClick={() => handleSessionLoad(user)}
-                  className="p-1 px-2.5 bg-black/40 hover:bg-black/70 text-[10px] text-brand-gold font-bold border border-brand-gold/20 rounded-lg flex items-center gap-1 transition"
+                  className="px-3 py-1.5 btn-gold-outline text-xs rounded-lg flex items-center gap-1.5 cursor-pointer"
                 >
-                  <RotateCw className="w-3 h-3" /> Refresh logs
+                  <RotateCw className="w-3.5 h-3.5" /> Refresh
                 </button>
               </div>
 
-              <div className="bg-black/90 border border-brand-gold/10 rounded-xl p-4 font-mono text-[11px] text-slate-300 space-y-2 h-[450px] overflow-y-auto no-scrollbar">
-                <div className="text-brand-gold border-b border-stone-900 pb-2 mb-2 flex justify-between font-bold">
-                  <span>LOG CONSOLE READY</span>
-                  <span>UTC TIME: {new Date().toISOString()}</span>
-                </div>
+              <div className="bg-black/60 border border-white/10 rounded-xl p-4 font-mono text-xs text-zinc-300 space-y-1.5 h-[460px] overflow-y-auto no-scrollbar">
                 {logs.length === 0 ? (
-                  <span className="text-slate-500">System idle... Waiting for scheduled trigger...</span>
+                  <span className="text-zinc-500">No activity logged yet.</span>
                 ) : (
                   logs.map((log) => (
-                    <div key={log.id} className="flex gap-2.5 py-1 border-b border-stone-900/60 leading-relaxed">
-                      <span className="text-stone-500 shrink-0 select-none">
-                        [{new Date(log.timestamp).toLocaleTimeString()}]
+                    <div key={log.id} className="flex gap-2.5 py-1 border-b border-white/5 leading-relaxed">
+                      <span className="text-zinc-500 shrink-0 select-none">
+                        {new Date(log.timestamp).toLocaleTimeString()}
                       </span>
-                      {log.type === 'success' && <span className="text-emerald-400 shrink-0 font-bold">[SUCCESS]</span>}
-                      {log.type === 'error' && <span className="text-red-400 shrink-0 font-bold">[ERROR]</span>}
-                      {log.type === 'info' && <span className="text-amber-400 shrink-0 font-bold">[INFO]</span>}
-                      <span className="text-slate-200 flex-1 whitespace-pre-wrap">{log.message}</span>
+                      {log.type === 'success' && <span className="text-emerald-400 shrink-0 font-semibold">OK</span>}
+                      {log.type === 'error' && <span className="text-red-400 shrink-0 font-semibold">ERR</span>}
+                      {log.type === 'info' && <span className="text-amber-400 shrink-0 font-semibold">INFO</span>}
+                      <span className="text-zinc-200 flex-1 whitespace-pre-wrap">{log.message}</span>
                     </div>
                   ))
                 )}
@@ -1735,7 +1729,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Configuration Tab */}
+          {/* Settings Tab */}
           {activeTab === 'config' && config && (
             <ConfigManager
               config={config}
@@ -1754,16 +1748,12 @@ export default function App() {
         </main>
       )}
 
-      {/* Footer system credit line */}
-      <footer className="glass-premium border-t border-brand-gold/10 py-6 text-center text-xs text-text-muted mt-auto">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Enterprise edition • Sandbox Node running on Port 3000</span>
-          <span className="font-mono text-[9px] sm:text-xs flex items-center gap-1.5 flex-wrap">
-            <span>App Version: <strong className="text-brand-gold font-semibold">{versionInfo.version}</strong></span>
-            <span className="text-brand-gold/40">•</span>
-            <span>Commit: <strong className="text-brand-gold font-semibold">{versionInfo.sha}</strong></span>
-            <span className="text-brand-gold/40">•</span>
-            <span>Built: <strong className="text-brand-gold font-semibold">{versionInfo.timestamp}</strong></span>
+      {/* Footer */}
+      <footer className="border-t border-white/5 py-4 text-xs text-zinc-500 mt-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-2">
+          <span>StoneContentManager</span>
+          <span className="font-mono text-[11px]">
+            v{versionInfo.version} · {versionInfo.sha}
           </span>
         </div>
       </footer>
@@ -1777,15 +1767,15 @@ export default function App() {
         />
       )}
 
-      {/* Non-blocking Rate Limit / Info Banner */}
+      {/* Non-blocking Top Banner */}
       {notifBanner && (
         <div
           role="alert"
           aria-live="polite"
-          className="fixed top-0 left-0 right-0 z-[60] flex items-center gap-3 px-4 py-3 bg-amber-950/95 border-b border-amber-500/40 backdrop-blur-sm shadow-2xl animate-slide-down"
+          className="fixed top-0 left-0 right-0 z-[60] flex items-center gap-3 px-4 py-3 bg-zinc-900/95 border-b border-white/15 backdrop-blur-md shadow-xl animate-slide-down"
         >
           <Zap className="w-4 h-4 text-amber-400 shrink-0" />
-          <p className="flex-1 text-xs font-medium text-amber-100 leading-relaxed">
+          <p className="flex-1 text-xs font-medium text-zinc-100 leading-relaxed">
             {notifBanner.message}
             {notifBanner.retryAt && (
               <span className="ml-2 text-amber-400 font-semibold">Retry at: {notifBanner.retryAt}</span>
@@ -1794,114 +1784,85 @@ export default function App() {
           <button
             onClick={dismissBanner}
             aria-label="Dismiss notification"
-            className="p-1 rounded-md hover:bg-amber-800/50 text-amber-300 hover:text-white transition shrink-0"
+            className="p-1 rounded-md hover:bg-white/10 text-zinc-400 hover:text-white transition shrink-0 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Custom Expandable Toast / Alert Dialog */}
+      {/* Alert Modal */}
       {customAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm transition-all focus:outline-none" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') setCustomAlert(null); }}>
-          <div className="w-full max-w-2xl bg-stone-900 border border-brand-gold/35 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col max-h-[90vh]">
-            
-            {/* Header */}
-            <div className={`px-6 py-4 flex items-center justify-between border-b shrink-0 ${
-              customAlert.type === 'error' ? 'border-red-500/20 bg-red-950/20' :
-              customAlert.type === 'warning' ? 'border-amber-500/20 bg-amber-950/20' :
-              customAlert.type === 'success' ? 'border-emerald-500/20 bg-emerald-950/20' :
-              'border-brand-gold/15 bg-black/40'
-            }`}>
-              <div className="flex items-center gap-3">
-                {customAlert.type === 'error' && <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />}
-                {customAlert.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />}
-                {customAlert.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />}
-                {customAlert.type === 'info' && <Shield className="w-5 h-5 text-brand-gold shrink-0" />}
-                <h3 className="font-display font-bold text-sm tracking-tight text-text-main uppercase">
-                  {customAlert.title}
-                </h3>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm focus:outline-none"
+          tabIndex={-1}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setCustomAlert(null);
+          }}
+        >
+          <div className="w-full max-w-lg bg-surface-dark border border-white/15 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="px-5 py-4 flex items-center justify-between border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-2.5">
+                {customAlert.type === 'error' && <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />}
+                {customAlert.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />}
+                {customAlert.type === 'success' && <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />}
+                {customAlert.type === 'info' && <Shield className="w-4 h-4 text-zinc-300 shrink-0" />}
+                <h3 className="font-semibold text-sm text-zinc-100">{customAlert.title}</h3>
               </div>
               <button
                 onClick={() => setCustomAlert(null)}
-                className="p-1 px-2 text-[10px] uppercase tracking-wider font-extrabold rounded bg-black/40 hover:bg-black/70 text-text-muted hover:text-text-main transition border border-brand-gold/5 hover:border-brand-gold/20"
+                className="p-1 text-zinc-400 hover:text-zinc-100 rounded-md hover:bg-white/5 transition cursor-pointer"
+                aria-label="Close"
               >
-                Close (Esc)
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Content Body */}
-            <div className="p-6 space-y-4 overflow-y-auto flex-1">
-              
-              {/* Short User-Facing Diagnostic message */}
-              <div className="text-sm font-medium text-text-main/90 leading-relaxed whitespace-pre-wrap">
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              <div className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">
                 {customAlert.message}
               </div>
 
-              {/* Special Note for Static Routing if warning/error is related */}
-              {(customAlert.message?.includes('doctype html') || 
-                customAlert.message?.includes('HTML block') || 
-                customAlert.technicalDetails?.includes('doctype html') ||
-                customAlert.technicalDetails?.includes('HTML block') ||
-                customAlert.technicalDetails?.includes('index.html')) && (
-                <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/20 space-y-2 text-[11px] leading-relaxed text-amber-200">
-                  <p className="font-semibold text-amber-300">💡 Diagnostic Advisory for Static Hosting (Firebase):</p>
-                  <p>
-                    Firebase Hosting is a fully client-side static service and has access only to static build files (HTML/CSS/JS). 
-                    Without a live database proxy rewrite or separate cloud functions deployment, requests to backend server APIs (<code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">/api/*</code>) will rewrite directly to your compiled <code className="bg-amber-950/60 px-1 py-0.5 rounded text-amber-300">index.html</code> file.
-                  </p>
-                  <p className="font-semibold text-amber-300">How to solve this:</p>
-                  <ul className="list-disc pl-4 space-y-1">
-                    <li>Recommended: Access the application through your Google AI Studio <strong className="text-amber-300">Cloud Run Dev/Preview link</strong>, which runs the Node/TS backend server inside containerized sandboxes!</li>
-                    <li>Or, connect/migrate Express routes to Firebase Functions rewrite.</li>
-                  </ul>
-                </div>
-              )}
-
-              {/* Technical Details / Expandable console-like block */}
               {customAlert.technicalDetails && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[11px] text-text-muted">
-                    <span className="font-mono text-[10px] tracking-wider uppercase">Full Server Response Log ({customAlert.technicalDetails.length} chars)</span>
+                  <div className="flex items-center justify-between text-xs text-zinc-500">
+                    <span>Details</span>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(customAlert.technicalDetails || '');
-                        alert('Full technical diagnostic log details copied to clipboard!');
                       }}
-                      className="px-2 py-1 bg-black hover:bg-black/75 rounded border border-brand-gold/15 transition flex items-center gap-1 cursor-pointer text-brand-gold font-bold font-mono text-[9px]"
+                      className="text-xs text-zinc-300 hover:text-white flex items-center gap-1 cursor-pointer"
                     >
-                      <Copy className="w-2.5 h-2.5" /> COPY RAW LOG
+                      <Copy className="w-3 h-3" /> Copy
                     </button>
                   </div>
-                  <div className="w-full h-48 overflow-auto rounded-xl bg-black border border-brand-gold/10 p-4 font-mono text-[10px] leading-relaxed text-red-300/90 whitespace-pre scrollbar-thin">
+                  <div className="w-full max-h-44 overflow-auto rounded-xl bg-black/60 border border-white/10 p-3 font-mono text-[11px] leading-relaxed text-red-300 whitespace-pre-wrap">
                     {customAlert.technicalDetails}
                   </div>
                 </div>
               )}
-
             </div>
 
-            {/* Bottom Actions */}
-            <div className="px-6 py-4 bg-stone-900/60 border-t border-brand-gold/10 flex items-center justify-end gap-3 shrink-0">
-              <button
-                onClick={() => setCustomAlert(null)}
-                className="px-5 py-2 hover:bg-white/5 text-text-muted hover:text-text-main text-xs font-bold rounded-xl transition cursor-pointer"
-              >
-                Acknowledge
-              </button>
+            <div className="px-5 py-3.5 border-t border-white/10 flex items-center justify-end gap-2 shrink-0">
               {customAlert.technicalDetails && (
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(`Title: ${customAlert.title}\nMessage: ${customAlert.message}\nDetails: ${customAlert.technicalDetails}`);
-                    alert('Full Diagnostic context successfully saved to clipboard!');
+                    navigator.clipboard.writeText(
+                      `Title: ${customAlert.title}\nMessage: ${customAlert.message}\nDetails: ${customAlert.technicalDetails}`
+                    );
                   }}
-                  className="px-5 py-2 bg-brand-gold/15 hover:bg-brand-gold/25 border border-brand-gold/30 hover:border-brand-gold/50 text-brand-gold text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-2 btn-gold-outline text-xs rounded-lg flex items-center gap-1.5 cursor-pointer"
                 >
                   <Copy className="w-3.5 h-3.5" /> Copy Log
                 </button>
               )}
+              <button
+                onClick={() => setCustomAlert(null)}
+                className="px-4 py-2 btn-gold text-xs rounded-lg cursor-pointer"
+              >
+                OK
+              </button>
             </div>
-
           </div>
         </div>
       )}

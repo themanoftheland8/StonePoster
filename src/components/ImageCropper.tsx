@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Crop, X, Check } from 'lucide-react';
+import { Crop, Check, X } from 'lucide-react';
 
 interface ImageCropperProps {
   imageUrl: string;
@@ -33,7 +33,8 @@ export default function ImageCropper({ imageUrl, onSave, onCancel }: ImageCroppe
   useEffect(() => {
     const handleDrag = (e: MouseEvent | TouchEvent) => {
       if (!dragInfo || !imageRef.current) return;
-      
+      if ('touches' in e) e.preventDefault();
+
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
@@ -41,7 +42,7 @@ export default function ImageCropper({ imageUrl, onSave, onCancel }: ImageCroppe
       const dxPercent = ((clientX - dragInfo.startX) / rect.width) * 100;
       const dyPercent = ((clientY - dragInfo.startY) / rect.height) * 100;
 
-      let newCrop = { ...dragInfo.startCrop };
+      const newCrop = { ...dragInfo.startCrop };
 
       if (dragInfo.action === 'move') {
         newCrop.x = Math.max(0, Math.min(100 - newCrop.w, dragInfo.startCrop.x + dxPercent));
@@ -67,9 +68,7 @@ export default function ImageCropper({ imageUrl, onSave, onCancel }: ImageCroppe
       setCrop(newCrop);
     };
 
-    const endDrag = () => {
-      setDragInfo(null);
-    };
+    const endDrag = () => setDragInfo(null);
 
     if (dragInfo) {
       window.addEventListener('mousemove', handleDrag);
@@ -103,40 +102,37 @@ export default function ImageCropper({ imageUrl, onSave, onCancel }: ImageCroppe
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, xPixel, yPixel, wPixel, hPixel, 0, 0, wPixel, hPixel);
-        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        onSave(croppedDataUrl);
+        onSave(canvas.toDataURL('image/jpeg', 0.9));
       }
     };
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-black/90 backdrop-blur-md">
-      <div className="w-full max-w-3xl flex flex-col bg-stone-900 border border-brand-gold/30 rounded-2xl overflow-hidden shadow-2xl">
-        {/* Header */}
-        <div className="px-6 py-4 flex items-center justify-between border-b border-brand-gold/15 bg-black/45">
-          <div className="flex items-center gap-2 text-brand-gold">
-            <Crop className="w-5 h-5" />
-            <h3 className="font-display font-bold text-sm tracking-tight uppercase">Crop Photo Editor</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="w-full max-w-3xl flex flex-col bg-surface-dark border border-white/15 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="px-5 py-3.5 flex items-center justify-between border-b border-white/10">
+          <div className="flex items-center gap-2 text-zinc-100">
+            <Crop className="w-4 h-4 text-zinc-400" />
+            <h3 className="font-semibold text-sm">Crop Photo</h3>
           </div>
           <button
             onClick={onCancel}
-            className="p-1 px-2 text-[10px] uppercase tracking-wider font-extrabold rounded bg-black/40 hover:bg-black/70 text-stone-400 hover:text-text-main transition border border-brand-gold/5"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition cursor-pointer"
+            aria-label="Cancel crop"
           >
-            Cancel
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Workspace */}
-        <div className="p-8 flex items-center justify-center bg-black/40 overflow-hidden min-h-[300px] max-h-[60vh]">
-          <div className="relative inline-block overflow-hidden max-w-full select-none rounded-lg border border-stone-800">
+        <div className="p-6 flex items-center justify-center bg-black/60 overflow-hidden min-h-[280px] max-h-[65vh]">
+          <div className="relative inline-block overflow-hidden max-w-full select-none touch-none rounded-lg border border-white/10">
             <img
               src={imageUrl}
               ref={imageRef}
               alt="Crop target"
-              className="max-w-full max-h-[50vh] object-contain pointer-events-none"
+              className="max-w-full max-h-[52vh] object-contain pointer-events-none"
             />
 
-            {/* Custom Backdrop Overlay parts around the crop box */}
             <div className="absolute top-0 left-0 right-0 bg-black/65" style={{ height: `${crop.y}%` }} />
             <div className="absolute bottom-0 left-0 right-0 bg-black/65" style={{ top: `${crop.y + crop.h}%` }} />
             <div
@@ -158,9 +154,8 @@ export default function ImageCropper({ imageUrl, onSave, onCancel }: ImageCroppe
               }}
             />
 
-            {/* The Crop Area Box */}
             <div
-              className="absolute border-2 border-brand-gold cursor-move shadow-[0_0_0_9999px_rgba(0,0,0,0)]"
+              className="absolute border-2 border-white cursor-move"
               style={{
                 left: `${crop.x}%`,
                 top: `${crop.y}%`,
@@ -170,28 +165,23 @@ export default function ImageCropper({ imageUrl, onSave, onCancel }: ImageCroppe
               onMouseDown={(e) => startDrag(e, 'move')}
               onTouchStart={(e) => startDrag(e, 'move')}
             >
-              {/* Draggable Corner Handles */}
-              {/* Top Left */}
               <div
-                className="absolute -top-2 -left-2 w-4 h-4 bg-brand-gold border-2 border-stone-900 rounded-full cursor-nwse-resize z-20 flex items-center justify-center"
+                className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-white border-2 border-zinc-900 rounded-full cursor-nwse-resize z-20 shadow"
                 onMouseDown={(e) => { e.stopPropagation(); startDrag(e, 'resize-TL'); }}
                 onTouchStart={(e) => { e.stopPropagation(); startDrag(e, 'resize-TL'); }}
               />
-              {/* Top Right */}
               <div
-                className="absolute -top-2 -right-2 w-4 h-4 bg-brand-gold border-2 border-stone-900 rounded-full cursor-nesw-resize z-20 flex items-center justify-center"
+                className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-white border-2 border-zinc-900 rounded-full cursor-nesw-resize z-20 shadow"
                 onMouseDown={(e) => { e.stopPropagation(); startDrag(e, 'resize-TR'); }}
                 onTouchStart={(e) => { e.stopPropagation(); startDrag(e, 'resize-TR'); }}
               />
-              {/* Bottom Left */}
               <div
-                className="absolute -bottom-2 -left-2 w-4 h-4 bg-brand-gold border-2 border-stone-900 rounded-full cursor-nesw-resize z-20 flex items-center justify-center"
+                className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-white border-2 border-zinc-900 rounded-full cursor-nesw-resize z-20 shadow"
                 onMouseDown={(e) => { e.stopPropagation(); startDrag(e, 'resize-BL'); }}
                 onTouchStart={(e) => { e.stopPropagation(); startDrag(e, 'resize-BL'); }}
               />
-              {/* Bottom Right */}
               <div
-                className="absolute -bottom-2 -right-2 w-4 h-4 bg-brand-gold border-2 border-stone-900 rounded-full cursor-nwse-resize z-20 flex items-center justify-center"
+                className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-white border-2 border-zinc-900 rounded-full cursor-nwse-resize z-20 shadow"
                 onMouseDown={(e) => { e.stopPropagation(); startDrag(e, 'resize-BR'); }}
                 onTouchStart={(e) => { e.stopPropagation(); startDrag(e, 'resize-BR'); }}
               />
@@ -199,21 +189,20 @@ export default function ImageCropper({ imageUrl, onSave, onCancel }: ImageCroppe
           </div>
         </div>
 
-        {/* Footer controls */}
-        <div className="px-6 py-4 bg-stone-900/60 border-t border-brand-gold/10 flex items-center justify-between">
-          <p className="text-[11px] text-stone-500 font-sans">
-            Drag the corners to resize. Drag the center to move the crop box.
+        <div className="px-5 py-3.5 border-t border-white/10 flex items-center justify-between gap-3">
+          <p className="text-xs text-zinc-500 hidden sm:block">
+            Drag corners to resize or drag inside to move.
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={onCancel}
-              className="px-5 py-2 hover:bg-white/5 text-stone-400 hover:text-text-main text-xs font-bold rounded-xl transition"
+              className="px-4 py-2 text-xs font-medium text-zinc-300 hover:bg-white/5 rounded-lg transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-5 py-2 bg-brand-gold/15 hover:bg-brand-gold/25 border border-brand-gold/30 text-brand-gold text-xs font-bold rounded-xl transition flex items-center gap-1.5"
+              className="px-4 py-2 btn-gold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
               Apply Crop

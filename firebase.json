@@ -22,6 +22,7 @@
     }
   ],
   "hosting": {
+    "site": "stone-content-manager",
     "public": "dist",
     "ignore": [
       "firebase.json",

@@ -58,12 +58,16 @@ export async function subscribeToWebPush(
     throw new Error('Web Push notifications are not supported in this browser.');
   }
 
-  const permission = await Notification.requestPermission();
+  let permission: NotificationPermission = Notification.permission;
+  if (permission === 'default') {
+    permission = await Notification.requestPermission();
+  }
+
   if (permission !== 'granted') {
     throw new Error(
       permission === 'denied'
-        ? 'Chrome notifications are blocked for this site. Allow notifications in Chrome Site Settings and try again.'
-        : 'Notification permission was dismissed.'
+        ? 'Browser returned notification permission "denied". If Chrome Site Settings already shows Allowed: (1) reload this tab, (2) open in a normal Chrome tab (not Incognito or an embedded/in-app browser), and (3) check OS notification settings for Chrome (Android Settings → Apps → Chrome → Notifications, or macOS System Settings → Notifications → Google Chrome).'
+        : 'Notification permission prompt was dismissed. Tap Enable Notifications again and choose Allow.'
     );
   }
 
@@ -87,10 +91,16 @@ export async function subscribeToWebPush(
   }
 
   if (!subscription) {
-    subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey,
-    });
+    try {
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+    } catch (subErr: any) {
+      throw new Error(
+        `Browser push subscription failed (${subErr?.message || subErr}). Make sure you are in a normal Chrome window (not Incognito or an embedded browser) and Chrome notifications are enabled in OS settings.`
+      );
+    }
   }
 
   const deviceLabel = getDeviceLabel();

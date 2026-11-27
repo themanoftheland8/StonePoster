@@ -40,7 +40,7 @@ function getAdminAuth() {
 }
 
 function getAppBaseUrl(): string {
-  return (process.env.APP_URL || 'https://twittertry2-8a870.web.app').replace(/\/$/, '');
+  return (process.env.APP_URL || 'https://stone-content-manager.web.app').replace(/\/$/, '');
 }
 
 // Service Account Google Drive Auth (ADC / Cloud Functions runtime service account)

@@ -40,7 +40,11 @@ function getDeviceLabel(): string {
 }
 
 export async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration> {
-  await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  const reg = await navigator.serviceWorker.register('/sw.js', {
+    scope: '/',
+    updateViaCache: 'none',
+  });
+  await reg.update().catch(() => {});
   return navigator.serviceWorker.ready;
 }
 

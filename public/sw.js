@@ -27,7 +27,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: payload.body,
     icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    badge: '/badge-96.png',
     tag: payload.tag || 'stone-content-review',
     renotify: true,
     data: {

@@ -895,26 +895,50 @@ app.post(['/api/posts/publish', '/api/posts/publish/'], apiLimiter, async (req, 
     // A. Post to Bluesky if enabled
     if (bluesky?.enabled && bluesky?.username && bluesky?.password) {
       try {
+        const identifier = String(bluesky.username).trim().replace(/^@/, '');
+        const appPassword = String(bluesky.password).trim();
+
+        const readAtProtoError = async (res: Response, fallbackLabel: string) => {
+          const text = await res.text().catch(() => '');
+          try {
+            const j = JSON.parse(text);
+            return `${fallbackLabel} (${res.status}): ${j.message || j.error || text || res.statusText}`;
+          } catch {
+            return `${fallbackLabel} (${res.status}): ${text || res.statusText || 'Unknown error'}`;
+          }
+        };
+
         const sessionRes = await fetch('https://bsky.social/xrpc/com.atproto.server.createSession', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            identifier: bluesky.username,
-            password: bluesky.password,
+            identifier,
+            password: appPassword,
           }),
         });
 
         if (!sessionRes.ok) {
-          throw new Error(`BSky Authentication failed: ${sessionRes.statusText}`);
+          throw new Error(await readAtProtoError(sessionRes, 'BSky Authentication failed'));
         }
 
-        const session = await sessionRes.json();
-        const { accessJwt, did } = session;
+        const session: any = await sessionRes.json();
+        const { accessJwt, did, didDoc } = session;
+        const pdsEndpoint = (
+          didDoc?.service?.find((s: any) => s.id === '#atproto_pds')?.serviceEndpoint ||
+          'https://bsky.social'
+        ).replace(/\/$/, '');
 
         let embedObj: any = undefined;
+        const isSupportedBskyImage = ['image/jpeg', 'image/png', 'image/webp'].includes(mimeTypeStr);
 
-        if (mediaBuffer) {
-          const blobUploadUrl = 'https://bsky.social/xrpc/com.atproto.repo.uploadBlob';
+        if (mediaBuffer && isSupportedBskyImage) {
+          if (mediaBuffer.length > 976 * 1024) {
+            throw new Error(
+              `BSky image too large (${Math.round(mediaBuffer.length / 1024)} KB; Bluesky max is 976 KB). Try cropping the image first.`
+            );
+          }
+
+          const blobUploadUrl = `${pdsEndpoint}/xrpc/com.atproto.repo.uploadBlob`;
           const uploadRes = await fetch(blobUploadUrl, {
             method: 'POST',
             headers: {
@@ -925,22 +949,22 @@ app.post(['/api/posts/publish', '/api/posts/publish/'], apiLimiter, async (req, 
           });
 
           if (!uploadRes.ok) {
-            throw new Error(`BSky image upload failed: ${uploadRes.statusText}`);
+            throw new Error(await readAtProtoError(uploadRes, 'BSky image upload failed'));
           }
 
-          const uploadData = await uploadRes.json();
+          const uploadData: any = await uploadRes.json();
           embedObj = {
             $type: 'app.bsky.embed.images',
             images: [
               {
                 image: uploadData.blob,
-                alt: 'AI generated visual post content',
+                alt: 'Social post image',
               },
             ],
           };
         }
 
-        const createRecordRes = await fetch('https://bsky.social/xrpc/com.atproto.repo.createRecord', {
+        const createRecordRes = await fetch(`${pdsEndpoint}/xrpc/com.atproto.repo.createRecord`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${accessJwt}`,
@@ -951,15 +975,15 @@ app.post(['/api/posts/publish', '/api/posts/publish/'], apiLimiter, async (req, 
             collection: 'app.bsky.feed.post',
             record: {
               $type: 'app.bsky.feed.post',
-              text: caption,
+              text: String(caption).slice(0, 300),
               createdAt: new Date().toISOString(),
-              embed: embedObj,
+              ...(embedObj ? { embed: embedObj } : {}),
             },
           }),
         });
 
         if (!createRecordRes.ok) {
-          throw new Error(`BSky listing post record failed: ${createRecordRes.statusText}`);
+          throw new Error(await readAtProtoError(createRecordRes, 'BSky post failed'));
         }
 
         results.bsky = { success: true, response: await createRecordRes.json() };

@@ -1110,15 +1110,43 @@ export default function App() {
       const bskyOutcome = publishResult.results.bsky;
       const twitterOutcome = publishResult.results.x;
 
-      let logMsg = `Publish Complete! \n`;
+      const enabledOutcomes: Array<{ name: string; ok: boolean; err?: string }> = [];
       if (config?.blueskyEnabled) {
-        logMsg += `Bluesky: ${bskyOutcome?.success ? '✅ Success' : `❌ Error: ${bskyOutcome?.error}`} \n`;
+        enabledOutcomes.push({
+          name: 'Bluesky',
+          ok: Boolean(bskyOutcome?.success),
+          err: bskyOutcome?.error,
+        });
       }
       if (config?.twitterEnabled) {
-        logMsg += `X/Twitter: ${twitterOutcome?.success ? '✅ Success' : `❌ Error: ${twitterOutcome?.error}`} \n`;
+        enabledOutcomes.push({
+          name: 'X/Twitter',
+          ok: Boolean(twitterOutcome?.success),
+          err: twitterOutcome?.error,
+        });
       }
 
-      await createSystemLog(user.uid, 'success', logMsg);
+      if (enabledOutcomes.length === 0) {
+        await createSystemLog(user.uid, 'error', 'Publish skipped — neither Bluesky nor X/Twitter is enabled in Configure Integrations.');
+        triggerAlert('warning', 'No Platforms Enabled', 'Enable Bluesky and/or X/Twitter under Configure Integrations before publishing.');
+        return;
+      }
+
+      const logMsg =
+        'Publish Result:\n' +
+        enabledOutcomes
+          .map((o) => `${o.name}: ${o.ok ? '✅ Success' : `❌ Error: ${o.err || 'Unknown error'}`}`)
+          .join('\n');
+
+      const anySucceeded = enabledOutcomes.some((o) => o.ok);
+      const anyFailed = enabledOutcomes.some((o) => !o.ok);
+
+      await createSystemLog(user.uid, anyFailed && !anySucceeded ? 'error' : 'success', logMsg);
+
+      if (!anySucceeded) {
+        triggerAlert('error', 'Publishing Failed', logMsg);
+        return;
+      }
 
       // Now move file inside Drive under "posted" folder (uses service account fallback if browser token expired)
       if (activePost.driveFileId) {
@@ -1160,7 +1188,11 @@ export default function App() {
         await createSystemLog(user.uid, 'info', `Rescheduled next automated polling loop for: ${new Date(nextTime).toLocaleTimeString()}`);
       }
 
-      triggerAlert('success', 'Asset Published', 'Your chosen caption alternative has been successfully synchronized and broadcast to social channels, and the Google Drive file compiled.');
+      if (anyFailed) {
+        triggerAlert('warning', 'Published with Errors', logMsg);
+      } else {
+        triggerAlert('success', 'Asset Published', 'Your chosen caption has been published to your enabled social channels.');
+      }
 
     } catch (err: any) {
       console.error(err);

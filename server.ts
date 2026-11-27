@@ -528,11 +528,39 @@ function cleanAndParseJSON(text: string): string[] {
   } catch {
     console.error('Failed to parse Gemini response as JSON. Text was:', text);
     return [
-      '✨ Captivating photo choice! Check this out on our channels.',
-      '🚀 Elevating our content with beautiful visual compositions.',
-      '🌟 A brand new visual story just posted. What do you think?',
+      'Well, that escalated quietly.',
+      'No context needed.',
+      'Today’s plot twist.',
     ];
   }
+}
+
+const CAPTION_PROMPT = `Write 3 short, clever captions for this image or video to post on X/Twitter or Bluesky.
+
+Rules:
+- Keep each caption punchy and brief (4 to 14 words; one short sentence or fragment).
+- Sound like a sharp, witty human: dry humor, clever observation, or understated irony tied to specific details in the image.
+- Make the 3 options genuinely different angles (e.g., deadpan one-liner, relatable twist, minimalist quip).
+- NO hashtags (#).
+- NO emojis.
+- NO generic AI filler or hype ("captivating", "elevating", "vibes", "stunning", "check this out", "what do you think?", "a reminder that", "nothing beats").
+- Return ONLY a valid JSON array of exactly 3 strings, like:
+["Caption 1", "Caption 2", "Caption 3"]`;
+
+async function generateMediaCaptions(mimeType: string, base64Data: string): Promise<string[]> {
+  const geminiRes = await getGeminiClient().models.generateContent({
+    model: 'gemini-3.5-flash',
+    contents: [
+      {
+        inlineData: {
+          mimeType,
+          data: base64Data,
+        },
+      },
+      CAPTION_PROMPT,
+    ],
+  });
+  return cleanAndParseJSON(geminiRes.text || '');
 }
 
 async function fetchDriveThumbnailDataUrl(
@@ -586,31 +614,7 @@ async function analyzeDriveMedia(
   const buffer = Buffer.from(arrayBuffer);
   const base64Data = buffer.toString('base64');
   const safeMimeType = mimeType || 'image/jpeg';
-
-  const prompt = `Analyze this image or video content and generate exactly 3 distinct, compelling, and ready-to-post social media captions/texts suitable for X/Twitter & Bluesky sharing.
-    Do NOT include any hashtags (#). Include sparse emojis if appropriate.
-    Return ONLY a valid JSON string of array format containing exactly 3 string values, like:
-    [
-      "Caption idea 1...",
-      "Caption idea 2...",
-      "Caption idea 3..."
-    ]`;
-
-  const geminiRes = await getGeminiClient().models.generateContent({
-    model: 'gemini-3.5-flash',
-    contents: [
-      {
-        inlineData: {
-          mimeType: safeMimeType,
-          data: base64Data,
-        },
-      },
-      prompt,
-    ],
-  });
-
-  const outputText = geminiRes.text || '';
-  const captions = cleanAndParseJSON(outputText);
+  const captions = await generateMediaCaptions(safeMimeType, base64Data);
 
   let returnedImageUrl = `data:${safeMimeType};base64,${base64Data}`;
 
@@ -852,29 +856,9 @@ app.post(['/api/posts/analyze-upload', '/api/posts/analyze-upload/'], apiLimiter
   }
 
   try {
-    const prompt = `Analyze this uploaded image and generate exactly 3 highly engaging social media captions suited for Twitter/X and Bluesky.
-    Represent the content beautifully. Keep captions concise and optimized. Do NOT include any hashtags (#).
-    Return ONLY a valid JSON string array of exactly 3 strings conforming to:
-    ["Caption 1", "Caption 2", "Caption 3"]`;
-
     const cleanBase64 = base64Data.split(',')[1] || base64Data;
     const safeMimeType = mimeType || 'image/jpeg';
-
-    const geminiRes = await getGeminiClient().models.generateContent({
-      model: 'gemini-3.5-flash',
-      contents: [
-        {
-          inlineData: {
-            mimeType: safeMimeType,
-            data: cleanBase64,
-          },
-        },
-        prompt,
-      ],
-    });
-
-    const outputText = geminiRes.text || '';
-    const captions = cleanAndParseJSON(outputText);
+    const captions = await generateMediaCaptions(safeMimeType, cleanBase64);
 
     res.json({
       success: true,

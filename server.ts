@@ -499,6 +499,14 @@ app.post(['/api/auth/refresh-drive-token', '/api/auth/refresh-drive-token/'], as
   }
 });
 
+function stripHashtags(caption: string): string {
+  return caption
+    .replace(/(^|\s)#[\p{L}\p{N}_-]+/gu, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
 // Helper: Parse Gemini JSON Array cleanly
 function cleanAndParseJSON(text: string): string[] {
   try {
@@ -514,7 +522,7 @@ function cleanAndParseJSON(text: string): string[] {
     clean = clean.trim();
     const parsed = JSON.parse(clean);
     if (Array.isArray(parsed)) {
-      return parsed.map(item => String(item));
+      return parsed.map(item => stripHashtags(String(item)));
     }
     throw new Error('Response was not a JSON array');
   } catch {
@@ -580,7 +588,7 @@ async function analyzeDriveMedia(
   const safeMimeType = mimeType || 'image/jpeg';
 
   const prompt = `Analyze this image or video content and generate exactly 3 distinct, compelling, and ready-to-post social media captions/texts suitable for X/Twitter & Bluesky sharing.
-    Include relevant sparse hashtags/emojis if you want.
+    Do NOT include any hashtags (#). Include sparse emojis if appropriate.
     Return ONLY a valid JSON string of array format containing exactly 3 string values, like:
     [
       "Caption idea 1...",
@@ -845,7 +853,7 @@ app.post(['/api/posts/analyze-upload', '/api/posts/analyze-upload/'], apiLimiter
 
   try {
     const prompt = `Analyze this uploaded image and generate exactly 3 highly engaging social media captions suited for Twitter/X and Bluesky.
-    Represent the content beautifully. Keep captions concise and optimized.
+    Represent the content beautifully. Keep captions concise and optimized. Do NOT include any hashtags (#).
     Return ONLY a valid JSON string array of exactly 3 strings conforming to:
     ["Caption 1", "Caption 2", "Caption 3"]`;
 
